@@ -86,7 +86,11 @@ struct AppState {
     config: Arc<Config>,
 }
 
-async fn init_db(db_pool: &sqlx::Pool<sqlx::Postgres>) -> SwiftlinkResult<()> {
+async fn init_db<T>(db_pool: &sqlx::Pool<sqlx::Postgres>) -> SwiftlinkResult<()>
+where
+    ServerError: std::convert::From<T>,
+    T: std::convert::From<sqlx::Error>,
+{
     sqlx::query!(
         r#"
             CREATE TABLE IF NOT EXISTS links (
@@ -97,7 +101,7 @@ async fn init_db(db_pool: &sqlx::Pool<sqlx::Postgres>) -> SwiftlinkResult<()> {
     )
     .execute(db_pool)
     .await
-    .map_err(|e| e.into())?;
+    .map_err(|e| <sqlx::Error as Into<T>>::into(e))?;
     info!("Created 'links' table");
 
     Ok(())
@@ -198,7 +202,7 @@ async fn main() -> SwiftlinkResult<()> {
         .await
         .expect("Failed to create database pool.");
 
-    if let Err(e) = init_db(&db_pool).await {
+    if let Err(e) = init_db::<ServerError>(&db_pool).await {
         error!("Failed to initialize database: {:?}", e);
         return Err(e);
     }
