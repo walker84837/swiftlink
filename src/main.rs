@@ -5,6 +5,18 @@ use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
 use std::{fs, path::PathBuf, sync::Arc};
+use thiserror::Error;
+
+type SwiftlinkResult<T> = Result<T, ServerError>;
+
+#[derive(Debug, Error)]
+enum ServerError {
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] sqlx::Error),
+
+    #[error("IO error: {0}")]
+    IOError(#[from] std::io::Error),
+}
 
 /// Server configuration, comprising of base options and database configuration
 #[derive(Deserialize)]
@@ -74,7 +86,7 @@ struct AppState {
     config: Arc<Config>,
 }
 
-async fn init_db(db_pool: &sqlx::Pool<sqlx::Postgres>) -> Result<(), sqlx::Error> {
+async fn init_db(db_pool: &sqlx::Pool<sqlx::Postgres>) -> SwiftlinkResult<()> {
     sqlx::query!(
         r#"
             CREATE TABLE IF NOT EXISTS links (
@@ -84,7 +96,8 @@ async fn init_db(db_pool: &sqlx::Pool<sqlx::Postgres>) -> Result<(), sqlx::Error
             "#
     )
     .execute(db_pool)
-    .await?;
+    .await
+    .map_err(|e| e.into())?;
     info!("Created 'links' table");
 
     Ok(())
@@ -129,9 +142,7 @@ async fn create_link(
     }
 }
 
-//
-// Handler for redirection: given a code, look up the original URL and redirect.
-//
+/// Handler for redirection: given a code, look up the original URL and redirect.
 async fn redirect(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
     let code = path.into_inner();
     let result = sqlx::query!("SELECT url FROM links WHERE code = $1", code)
@@ -157,7 +168,7 @@ struct Args {
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> SwiftlinkResult<()> {
     env_logger::init();
     let args = Args::parse();
 
@@ -189,10 +200,7 @@ async fn main() -> std::io::Result<()> {
 
     if let Err(e) = init_db(&db_pool).await {
         error!("Failed to initialize database: {:?}", e);
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Database initialization failed",
-        ));
+        return Err(e);
     }
 
     let state = web::Data::new(AppState {
@@ -211,5 +219,7 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(("0.0.0.0", port))?
     .run()
-    .await
+    .await?;
+
+    Ok(())
 }
