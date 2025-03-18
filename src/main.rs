@@ -5,7 +5,13 @@ use log::{LevelFilter, error, info};
 use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use thiserror::Error;
 
 type SwiftlinkResult<T> = Result<T, ServerError>;
@@ -70,6 +76,13 @@ impl Default for Config {
     }
 }
 
+#[derive(Serialize)]
+struct InfoResponse {
+    code: String,
+    created_at: i64,
+    url: String,
+}
+
 #[derive(Deserialize)]
 struct CreateLinkRequest {
     url: String,
@@ -94,11 +107,12 @@ where
 {
     sqlx::query!(
         r#"
-            CREATE TABLE IF NOT EXISTS links (
-                code TEXT PRIMARY KEY,
-                url TEXT NOT NULL
-            )
-            "#
+        CREATE TABLE IF NOT EXISTS links (
+            code TEXT PRIMARY KEY,
+            url TEXT NOT NULL,
+            created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT
+        )
+        "#
     )
     .execute(db_pool)
     .await
@@ -116,7 +130,6 @@ async fn create_link(
     state: web::Data<AppState>,
     req: web::Json<CreateLinkRequest>,
 ) -> impl Responder {
-    // Determine code length from config (default to 6)
     let code_size = state.config.base.code_size.unwrap_or(6);
     let code: String = rand::rng()
         .sample_iter(&Alphanumeric)
@@ -124,17 +137,23 @@ async fn create_link(
         .map(char::from)
         .collect();
 
+    let created_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_secs() as i64;
+
     let result = sqlx::query!(
-        "INSERT INTO links (code, url) VALUES ($1, $2)",
+        "INSERT INTO links (code, url, created_at) VALUES ($1, $2, $3)",
         code,
-        req.url
+        req.url,
+        created_at
     )
     .execute(&state.db_pool)
     .await;
 
     match result {
         Ok(_) => {
-            info!("Created link: {} -> {}", code, req.url);
+            info!("Created link: {} -> {} at {}", code, req.url, created_at);
             HttpResponse::Ok().json(CreateLinkResponse {
                 code: code.clone(),
                 url: req.url.clone(),
@@ -143,6 +162,25 @@ async fn create_link(
         Err(e) => {
             error!("Error inserting link: {:?}", e);
             HttpResponse::InternalServerError().body("Error creating link")
+        }
+    }
+}
+
+async fn get_link_info(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
+    let code = path.into_inner();
+    let result = sqlx::query!("SELECT url, created_at FROM links WHERE code = $1", code)
+        .fetch_one(&state.db_pool)
+        .await;
+
+    match result {
+        Ok(record) => HttpResponse::Ok().json(InfoResponse {
+            code,
+            created_at: record.created_at.unwrap_or_default(),
+            url: record.url,
+        }),
+        Err(e) => {
+            error!("Error fetching info for code {}: {:?}", code, e);
+            HttpResponse::NotFound().body("Link not found")
         }
     }
 }
@@ -227,6 +265,7 @@ async fn main() -> SwiftlinkResult<()> {
         App::new()
             .app_data(state.clone())
             .route("/api/create", web::post().to(create_link))
+            .route("/api/info/{code}", web::get().to(get_link_info))
             .route("/{code}", web::get().to(redirect))
     })
     .bind(("0.0.0.0", port))?
