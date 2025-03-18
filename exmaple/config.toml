@@ -2,11 +2,10 @@
 code_size = 6
 port = 8080
 
-
 [database]
 username = "swiftlink"
 password = "archbtw"
 host = "localhost"
 port = 5432
 database = "swiftlink_db"
-max_connections = 5
+max_connections = 12
