@@ -1,6 +1,7 @@
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use clap::{Parser, ValueHint};
-use log::{error, info};
+use env_logger::Target;
+use log::{LevelFilter, error, info};
 use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
@@ -45,7 +46,7 @@ struct DatabaseConfig {
     host: Option<String>,
     /// Optional port (default 5432)
     port: Option<u16>,
-    /// Optional database name (default "link_shortener")
+    /// Optional database name (default "swiftlink_db")
     database: Option<String>,
     max_connections: Option<u32>,
 }
@@ -62,7 +63,7 @@ impl Default for Config {
                 password: "password".into(),
                 host: Some("localhost".into()),
                 port: Some(5432),
-                database: Some("link_shortener".into()),
+                database: Some("swiftlink_db".into()),
                 max_connections: Some(5),
             },
         }
@@ -169,14 +170,21 @@ struct Args {
     /// Path to the configuration file
     #[arg(short, long, value_hint = ValueHint::FilePath)]
     config: PathBuf,
+
+    /// Log level
+    #[arg(short, long, default_value = "Info")]
+    log_level: LevelFilter,
 }
 
 #[actix_web::main]
 async fn main() -> SwiftlinkResult<()> {
-    env_logger::init();
     let args = Args::parse();
 
-    // TODO: use bufreader if needed
+    env_logger::builder()
+        .filter_level(args.log_level)
+        .target(Target::Stderr)
+        .init();
+
     let config: Config = fs::read_to_string(args.config)
         .ok()
         .and_then(|s| toml::from_str(&s).ok())
@@ -193,7 +201,7 @@ async fn main() -> SwiftlinkResult<()> {
         db_config
             .database
             .as_ref()
-            .unwrap_or(&"link_shortener".to_string()),
+            .unwrap_or(&"swiftlink_db".to_string()),
     );
 
     let db_pool = PgPoolOptions::new()

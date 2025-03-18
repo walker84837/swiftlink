@@ -2,10 +2,11 @@
 code_size = 6
 port = 8080
 
+
 [database]
-username = "postgres"
-password = "password"
+username = "swiftlink"
+password = "archbtw"
 host = "localhost"
 port = 5432
-database = "link_shortener"
+database = "swiftlink_db"
 max_connections = 5
