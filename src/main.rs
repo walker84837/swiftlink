@@ -175,7 +175,7 @@ async fn get_link_info(state: web::Data<AppState>, path: web::Path<String>) -> i
     match result {
         Ok(record) => HttpResponse::Ok().json(InfoResponse {
             code,
-            created_at: record.created_at.unwrap_or_default(),
+            created_at: record.created_at,
             url: record.url,
         }),
         Err(e) => {
