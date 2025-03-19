@@ -47,11 +47,21 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 
 ### Roadmap
 
+**Functionality**:
 - [ ] Add authentication support (JWT or similar).
+- [X] Add /api/info endpoint.
+- [X] Deduplicate links.
+- [X] Check if links exist before creating.
+
+**Look and feel**:
 - [ ] Make project logo for favicon.ico.
-- [ ] Add /api/info endpoint.
-- [ ] Deduplicate links.
-- [ ] Check if links exist before creating.
+- [ ] Add landing page:
+  - [ ] Information about the project
+  - [ ] Simple usage with cURL
+  - [ ] Templating (handlebars) for the landing page (domain, port, etc)
+
+**Documentation**:
+- [ ] Information about the API
 
 ## License
 
