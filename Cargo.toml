@@ -1,11 +1,11 @@
 [package]
 name = "swiftlink"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 repository = "https://github.com/walker84837/swiftlink"
 rust-version = "1.85.0"
-# categories = []
-# keywords = []
+categories = ["web-programming", "database", "authentication", "caching", "command-line-interface"]
+keywords = ["url-shortening", "web-server", "postgresql", "actix-web", "cli-configuration"]
 
 [profile.release]
 strip = true
