@@ -2136,6 +2136,7 @@ dependencies = [
  "sqlx",
  "thiserror",
  "toml",
+ "url",
 ]
 
 [[package]]
