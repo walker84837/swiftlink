@@ -9,6 +9,8 @@ Swiftlink is a URL shortener built with Rust and [Actix](https://actix.rs). It e
 - [Features](#features)
 - [Usage](#usage)
   - [Configuration](#configuration)
+- [API](#api)
+  - [Endpoints](#endpoints)
 - [Contributions](#contributions)
   - [Roadmap](#roadmap)
 - [License](#license)
@@ -49,9 +51,9 @@ This is the API for Swiftlink to create short links, retrieve information about 
 
 | Endpoint | URL | Method | Request Body | Response | Error Handling |
 | --- | --- | --- | --- | --- | --- |
-| Create link | `/api/create` | POST | `application/json`: {url} | application/json: {code, url} | `400 Bad Request`, `500 Internal Server Error` |
-| Get link info | `/api/info/{code}` | GET | - | `application/json`: {code, created_at, url} | `404 Not Found` |
-| Redirect | `/{code}` | GET | - | `302 Found` with `Location` header | `404 Not Found` |
+| Create link | `/api/create` | POST | `application/json`: `{url}` | `application/json`: `{code, url}` | `400 Bad Request`, `500 Internal Server Error` |
+| Get link info | `/api/info/{code}` | GET | N/A | `application/json`: `{code, created_at, url}` | `404 Not Found` |
+| Redirect | `/{code}` | GET | N/A | `302 Found` with `Location` header | `404 Not Found` |
 
 ## Contributions
 
