@@ -41,6 +41,18 @@ The configuration file is in TOML format and should be placed wherever you want,
 | `database`     | Database name                              | `swiftlink_db`   |
 | `max_connections` | Maximum database connections             | 5                |
 
+## API
+
+This is the API for Swiftlink to create short links, retrieve information about existing links, and redirect to the original URL.
+
+### Endpoints
+
+| Endpoint | URL | Method | Request Body | Response | Error Handling |
+| --- | --- | --- | --- | --- | --- |
+| Create link | `/api/create` | POST | `application/json`: {url} | application/json: {code, url} | `400 Bad Request`, `500 Internal Server Error` |
+| Get link info | `/api/info/{code}` | GET | - | `application/json`: {code, created_at, url} | `404 Not Found` |
+| Redirect | `/{code}` | GET | - | `302 Found` with `Location` header | `404 Not Found` |
+
 ## Contributions
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
@@ -59,9 +71,6 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
   - [ ] Information about the project
   - [ ] Simple usage with cURL
   - [ ] Templating (handlebars) for the landing page (domain, port, etc)
-
-**Documentation**:
-- [ ] Information about the API
 
 ## License
 
