@@ -1,6 +1,7 @@
 [base]
 code_size = 6
 port = 8080
+bearer_token = "CrGNF75kBN"
 
 [database]
 username = "swiftlink"
