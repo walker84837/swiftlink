@@ -43,9 +43,16 @@ jobs:
           rustup default stable
           cargo install sqlx-cli
 
-      - name: Generate offline data (sqlx-data.json)
+      - name: Run SQLx Migrations
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/swiftlink_db
         run: |
-          export DATABASE_URL=postgres://postgres:password@localhost:5432/swiftlink_db
+          sqlx migrate run
+
+      - name: Generate offline data (sqlx-data.json)
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/swiftlink_db
+        run: |
           cargo sqlx prepare -- --bin swiftlink
 
       - name: Upload sqlx-data.json artifact
