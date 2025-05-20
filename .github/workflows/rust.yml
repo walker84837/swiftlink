@@ -7,18 +7,9 @@ on:
     branches: ["**"]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            rust_target: x86_64-unknown-linux-gnu
-          - os: macos-latest
-            rust_target: x86_64-apple-darwin
-          - os: windows-latest
-            rust_target: x86_64-pc-windows-msvc
-
+  sqlx-prepare:
+    name: Generate SQLx Offline Data
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:latest
@@ -47,6 +38,47 @@ jobs:
         env:
           PGPASSWORD: password
 
+      - name: Install Rust & SQLx CLI
+        run: |
+          rustup default stable
+          cargo install sqlx-cli
+
+      - name: Generate offline data (sqlx-data.json)
+        run: |
+          export DATABASE_URL=postgres://postgres:password@localhost:5432/swiftlink_db
+          cargo sqlx prepare -- --bin swiftlink
+
+      - name: Upload sqlx-data.json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlx-data-json
+          path: sqlx-data.json
+          retention-days: 1
+
+  build-all:
+    needs: [sqlx-prepare]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            rust_target: x86_64-apple-darwin
+          - os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Download SQLx offline data
+        uses: actions/download-artifact@v4
+        with:
+          name: sqlx-data-json
+          path: .
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -54,8 +86,8 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Set DATABASE_URL
-        run: echo "DATABASE_URL=postgres://postgres:password@localhost:5432/swiftlink_db" >> $GITHUB_ENV
+      - name: Set SQLX_OFFLINE
+        run: echo "SQLX_OFFLINE=true" >> $GITHUB_ENV
 
       - name: Build (debug)
         run: cargo build --target ${{ matrix.rust_target }}
