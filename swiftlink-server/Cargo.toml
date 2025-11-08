@@ -1,0 +1,24 @@
+[package]
+name = "swiftlink-server"
+version = "0.0.2"
+edition = "2024"
+
+[profile.release]
+strip = true
+lto = true
+overflow-checks = true
+panic = "abort"
+opt-level = 3
+
+[dependencies]
+actix-web = { workspace = true, features = ["rustls"] }
+clap = { workspace = true, features = ["derive"] }
+env_logger = { workspace = true }
+log = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "postgres", "tls-rustls"] }
+thiserror = { workspace = true }
+toml = { workspace = true }
+url = { workspace = true }
+swiftlink-api = { path = "../swiftlink-api", features = ["async"] }

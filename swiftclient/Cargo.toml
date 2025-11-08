@@ -1,0 +1,8 @@
+[package]
+name = "swiftclient"
+version = "0.0.2"
+edition = "2024"
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+swiftlink-api = { path = "../swiftlink-api", features = ["blocking"] }
