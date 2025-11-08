@@ -3,22 +3,16 @@ name = "swiftlink-server"
 version = "0.0.2"
 edition = "2024"
 
-[profile.release]
-strip = true
-lto = true
-overflow-checks = true
-panic = "abort"
-opt-level = 3
 
 [dependencies]
-actix-web = { workspace = true, features = ["rustls"] }
-clap = { workspace = true, features = ["derive"] }
-env_logger = { workspace = true }
-log = { workspace = true }
-rand = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-sqlx = { workspace = true, features = ["runtime-tokio", "postgres", "tls-rustls"] }
-thiserror = { workspace = true }
-toml = { workspace = true }
-url = { workspace = true }
+actix-web = { version = "4.10.2", features = ["rustls"] }
+clap = { version = "4.5.32", features = ["derive"] }
+env_logger = "0.11.7"
+log = "0.4.26"
+rand = "0.9.0"
+serde = { version = "1.0.219", features = ["derive"] }
+sqlx = { version = "0.8.3", features = ["runtime-tokio", "postgres", "tls-rustls"] }
+thiserror = "2.0.12"
+toml = "0.8.20"
+url = "2.5.4"
 swiftlink-api = { path = "../swiftlink-api", features = ["async"] }

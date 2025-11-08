@@ -15,14 +15,9 @@ license = "Apache-2.0 OR MIT"
 categories = ["web-programming", "database", "authentication", "caching", "command-line-interface"]
 keywords = ["url-shortening", "web-server", "postgresql", "actix-web", "cli-configuration"]
 
-[workspace.dependencies]
-actix-web = { version = "4.10.2", features = ["rustls"] }
-clap = { version = "4.5.32", features = ["derive"] }
-env_logger = "0.11.7"
-log = "0.4.26"
-rand = "0.9.0"
-serde = { version = "1.0.219", features = ["derive"] }
-sqlx = { version = "0.8.3", features = ["runtime-tokio", "postgres", "tls-rustls"] }
-thiserror = "2.0.12"
-toml = "0.8.20"
-url = "2.5.4"
+[profile.release]
+strip = true
+lto = true
+overflow-checks = true
+panic = "abort"
+opt-level = 3
