@@ -7,6 +7,9 @@ use swiftlink_api::{
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    #[clap(short, long)]
+    base_url: String,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -35,7 +38,7 @@ enum Commands {
 
 fn main() -> Result<(), SwiftlinkClientError> {
     let cli = Cli::parse();
-    let client = BlockingSwiftlinkClient::new("http://localhost:8080");
+    let client = BlockingSwiftlinkClient::new(cli.base_url);
 
     match &cli.command {
         Commands::Create { url } => {
