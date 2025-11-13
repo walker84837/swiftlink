@@ -4,7 +4,12 @@ use env_logger::Target;
 use log::{LevelFilter, error, info, warn};
 use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{
+    postgres::PgPoolOptions,
+    sqlite::SqlitePoolOptions,
+    PgPool,
+    SqlitePool,
+};
 use std::{
     borrow::Cow,
     fs,
@@ -56,11 +61,20 @@ struct BaseOptions {
     bearer_token: Option<String>,
 }
 
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum DatabaseType {
+    Postgres,
+    Sqlite,
+}
+
 /// Database-specific configuration
 #[derive(Deserialize)]
 struct DatabaseConfig {
-    username: String,
-    password: String,
+    #[serde(default = "default_database_type")]
+    database_type: DatabaseType,
+    username: Option<String>,
+    password: Option<String>,
     /// Optional host (default "localhost")
     host: Option<String>,
     /// Optional port (default 5432)
@@ -68,6 +82,10 @@ struct DatabaseConfig {
     /// Optional database name (default "swiftlink_db")
     database: Option<String>,
     max_connections: Option<u32>,
+}
+
+fn default_database_type() -> DatabaseType {
+    DatabaseType::Postgres
 }
 
 impl Default for Config {
@@ -79,8 +97,9 @@ impl Default for Config {
                 bearer_token: None,
             },
             database: DatabaseConfig {
-                username: "postgres".into(),
-                password: "password".into(),
+                database_type: DatabaseType::Postgres,
+                username: Some("postgres".into()),
+                password: Some("password".into()),
                 host: Some("localhost".into()),
                 port: Some(5432),
                 database: Some("swiftlink_db".into()),
@@ -90,7 +109,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, sqlx::FromRow)]
 struct InfoResponse {
     code: String,
     created_at: i64,
@@ -109,29 +128,48 @@ struct CreateLinkResponse {
 }
 
 #[derive(Clone)]
+enum Pool {
+    Postgres(PgPool),
+    Sqlite(SqlitePool),
+}
+
+#[derive(Clone)]
 struct AppState {
-    db_pool: sqlx::Pool<sqlx::Postgres>,
+    db_pool: Pool,
     config: Arc<Config>,
 }
 
 /// Initialize the database (create the links table)
-async fn init_db<T>(db_pool: &sqlx::Pool<sqlx::Postgres>) -> SwiftlinkResult<()>
-where
-    ServerError: From<T>,
-    T: From<sqlx::Error>,
+async fn init_db(db_pool: &Pool) -> SwiftlinkResult<()>
 {
-    sqlx::query!(
-        r#"
-        CREATE TABLE IF NOT EXISTS links (
-            code TEXT PRIMARY KEY,
-            url TEXT NOT NULL,
-            created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT
-        )
-        "#
-    )
-    .execute(db_pool)
-    .await
-    .map_err(|e| <sqlx::Error as Into<T>>::into(e))?;
+    match db_pool {
+        Pool::Postgres(pool) => {
+            sqlx::query(
+                r#"
+                CREATE TABLE IF NOT EXISTS links (
+                    code TEXT PRIMARY KEY,
+                    url TEXT NOT NULL,
+                    created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT
+                )
+                "#,
+            )
+            .execute(pool)
+            .await?;
+        }
+        Pool::Sqlite(pool) => {
+            sqlx::query(
+                r#"
+                CREATE TABLE IF NOT EXISTS links (
+                    code TEXT PRIMARY KEY,
+                    url TEXT NOT NULL,
+                    created_at BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))
+                )
+                "#,
+            )
+            .execute(pool)
+            .await?;
+        }
+    }
 
     Ok(())
 }
@@ -155,13 +193,25 @@ fn validate_url(input: &str) -> Result<(), &'static str> {
 /// Returns Ok(Some(existing_code)) if found, Ok(None) if not found,
 /// or Err(response) if a database error occurs.
 async fn check_existing_url(
-    db_pool: &sqlx::Pool<sqlx::Postgres>,
+    db_pool: &Pool,
     url: &str,
 ) -> Result<Option<String>, HttpResponse> {
-    match sqlx::query_scalar!("SELECT code FROM links WHERE url = $1", url)
-        .fetch_optional(db_pool)
-        .await
-    {
+    let result = match db_pool {
+        Pool::Postgres(pool) => {
+            sqlx::query_scalar("SELECT code FROM links WHERE url = $1")
+                .bind(url)
+                .fetch_optional(pool)
+                .await
+        }
+        Pool::Sqlite(pool) => {
+            sqlx::query_scalar("SELECT code FROM links WHERE url = $1")
+                .bind(url)
+                .fetch_optional(pool)
+                .await
+        }
+    };
+
+    match result {
         Ok(result) => Ok(result),
         Err(e) => {
             error!("Error checking for existing URL: {:?}", e);
@@ -172,32 +222,55 @@ async fn check_existing_url(
 
 /// Inserts a new link into the database.
 async fn insert_new_link(
-    db_pool: &sqlx::Pool<sqlx::Postgres>,
+    db_pool: &Pool,
     url: &str,
     code: &str,
     created_at: i64,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        "INSERT INTO links (code, url, created_at) VALUES ($1, $2, $3)",
-        code,
-        url,
-        created_at
-    )
-    .execute(db_pool)
-    .await
-    .map(|_| ())
+    match db_pool {
+        Pool::Postgres(pool) => {
+            sqlx::query("INSERT INTO links (code, url, created_at) VALUES ($1, $2, $3)")
+                .bind(code)
+                .bind(url)
+                .bind(created_at)
+                .execute(pool)
+                .await
+                .map(|_| ())
+        }
+        Pool::Sqlite(pool) => {
+            sqlx::query("INSERT INTO links (code, url, created_at) VALUES ($1, $2, $3)")
+                .bind(code)
+                .bind(url)
+                .bind(created_at)
+                .execute(pool)
+                .await
+                .map(|_| ())
+        }
+    }
 }
 
 /// Handles the unique constraint conflict by fetching the existing link code.
 /// Returns Ok(response) if successful, or Err(response) if a database error occurs.
 async fn handle_unique_conflict(
-    db_pool: &sqlx::Pool<sqlx::Postgres>,
+    db_pool: &Pool,
     url: &str,
 ) -> Result<HttpResponse, HttpResponse> {
-    match sqlx::query_scalar!("SELECT code FROM links WHERE url = $1", url)
-        .fetch_one(db_pool)
-        .await
-    {
+    let result = match db_pool {
+        Pool::Postgres(pool) => {
+            sqlx::query_scalar("SELECT code FROM links WHERE url = $1")
+                .bind(url)
+                .fetch_one(pool)
+                .await
+        }
+        Pool::Sqlite(pool) => {
+            sqlx::query_scalar("SELECT code FROM links WHERE url = $1")
+                .bind(url)
+                .fetch_one(pool)
+                .await
+        }
+    };
+
+    match result {
         Ok(existing_code) => {
             info!("URL inserted concurrently: {} -> {}", existing_code, url);
             Ok(HttpResponse::Ok().json(CreateLinkResponse {
@@ -240,14 +313,27 @@ async fn delete_link(
     }
 
     let code_to_delete: String = path.into_inner();
-    let result = sqlx::query!("DELETE FROM links WHERE code = $1", code_to_delete)
-        .execute(&state.db_pool)
-        .await;
+    let result = match &state.db_pool {
+        Pool::Postgres(pool) => {
+            sqlx::query("DELETE FROM links WHERE code = $1")
+                .bind(&code_to_delete)
+                .execute(pool)
+                .await
+                .map(|r| r.rows_affected())
+        }
+        Pool::Sqlite(pool) => {
+            sqlx::query("DELETE FROM links WHERE code = $1")
+                .bind(&code_to_delete)
+                .execute(pool)
+                .await
+                .map(|r| r.rows_affected())
+        }
+    };
     info!("Deleting code: {code_to_delete}");
 
     match result {
         Ok(res) => {
-            if res.rows_affected() == 0 {
+            if res == 0 {
                 HttpResponse::NotFound().body("Link not found")
             } else {
                 HttpResponse::Ok().body("Link deleted")
@@ -308,7 +394,12 @@ async fn create_link(
         Err(e) => {
             // Check if the error is a duplicate key error (unique constraint violation)
             if let sqlx::Error::Database(db_err) = &e {
-                if db_err.code() == Some(Cow::Borrowed("23505")) {
+                let is_unique_constraint_violation = match state.config.database.database_type {
+                    DatabaseType::Postgres => db_err.code() == Some(Cow::Borrowed("23505")),
+                    DatabaseType::Sqlite => db_err.code() == Some(Cow::Borrowed("2067")),
+                };
+
+                if is_unique_constraint_violation {
                     return match handle_unique_conflict(&state.db_pool, &req.url).await {
                         Ok(response) => response,
                         Err(err_response) => err_response,
@@ -321,12 +412,29 @@ async fn create_link(
     }
 }
 
+#[derive(sqlx::FromRow)]
+struct LinkInfo {
+    url: String,
+    created_at: i64,
+}
+
 /// API Handler: Get link info (given a code)
 async fn get_link_info(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
     let code = path.into_inner();
-    let result = sqlx::query!("SELECT url, created_at FROM links WHERE code = $1", code)
-        .fetch_one(&state.db_pool)
-        .await;
+    let result = match &state.db_pool {
+        Pool::Postgres(pool) => {
+            sqlx::query_as::<_, LinkInfo>("SELECT url, created_at FROM links WHERE code = $1")
+                .bind(&code)
+                .fetch_one(pool)
+                .await
+        }
+        Pool::Sqlite(pool) => {
+            sqlx::query_as::<_, LinkInfo>("SELECT url, created_at FROM links WHERE code = $1")
+                .bind(&code)
+                .fetch_one(pool)
+                .await
+        }
+    };
 
     match result {
         Ok(record) => HttpResponse::Ok().json(InfoResponse {
@@ -344,13 +452,24 @@ async fn get_link_info(state: web::Data<AppState>, path: web::Path<String>) -> i
 /// Handler for redirection: given a code, look up the original URL and redirect.
 async fn redirect(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
     let code = path.into_inner();
-    let result = sqlx::query!("SELECT url FROM links WHERE code = $1", code)
-        .fetch_one(&state.db_pool)
-        .await;
+    let result = match &state.db_pool {
+        Pool::Postgres(pool) => {
+            sqlx::query_scalar::<_, String>("SELECT url FROM links WHERE code = $1")
+                .bind(&code)
+                .fetch_one(pool)
+                .await
+        }
+        Pool::Sqlite(pool) => {
+            sqlx::query_scalar::<_, String>("SELECT url FROM links WHERE code = $1")
+                .bind(&code)
+                .fetch_one(pool)
+                .await
+        }
+    };
 
     match result {
         Ok(record) => HttpResponse::Found()
-            .append_header(("Location", record.url))
+            .append_header(("Location", record))
             .finish(),
         Err(e) => {
             error!("Error fetching link: {:?}", e);
@@ -395,27 +514,43 @@ async fn main() -> SwiftlinkResult<()> {
     }
 
     let config = Arc::new(raw_config);
-
     let db_config = &config.database;
-    let database_url = format!(
-        "postgres://{}:{}@{}:{}/{}",
-        db_config.username,
-        db_config.password,
-        db_config.host.as_ref().unwrap_or(&"localhost".to_string()),
-        db_config.port.unwrap_or(5432),
-        db_config
-            .database
-            .as_ref()
-            .unwrap_or(&"swiftlink_db".to_string()),
-    );
 
-    let db_pool = PgPoolOptions::new()
-        .max_connections(db_config.max_connections.unwrap_or(5))
-        .connect(&database_url)
-        .await
-        .expect("Failed to create database pool.");
+    let db_pool = match db_config.database_type {
+        DatabaseType::Postgres => {
+            let database_url = format!(
+                "postgres://{}:{}@{}:{}/{}",
+                db_config.username.as_ref().unwrap(),
+                db_config.password.as_ref().unwrap(),
+                db_config.host.as_ref().unwrap_or(&"localhost".to_string()),
+                db_config.port.unwrap_or(5432),
+                db_config
+                    .database
+                    .as_ref()
+                    .unwrap_or(&"swiftlink_db".to_string()),
+            );
+            let pool = PgPoolOptions::new()
+                .max_connections(db_config.max_connections.unwrap_or(5))
+                .connect(&database_url)
+                .await
+                .expect("Failed to create database pool.");
+            Pool::Postgres(pool)
+        }
+        DatabaseType::Sqlite => {
+            let database_url = db_config
+                .database
+                .as_ref()
+                .expect("Database path must be specified for SQLite");
+            let pool = SqlitePoolOptions::new()
+                .max_connections(db_config.max_connections.unwrap_or(5))
+                .connect(&database_url)
+                .await
+                .expect("Failed to create database pool.");
+            Pool::Sqlite(pool)
+        }
+    };
 
-    if let Err(e) = init_db::<ServerError>(&db_pool).await {
+    if let Err(e) = init_db(&db_pool).await {
         error!("Failed to initialize database: {:?}", e);
         return Err(e);
     }
