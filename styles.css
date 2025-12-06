@@ -14,14 +14,14 @@
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Inter', sans-serif;
     background-color: var(--color-bg);
     color: var(--color-text);
     margin: 0;
     padding: 20px;
 }
 
-.content {
+main {
     max-width: 800px;
     margin: 0 auto;
     background-color: var(--color-container-bg);
@@ -61,6 +61,10 @@ blockquote {
     margin: 20px 0;
     padding: 5px 20px;
     font-style: italic;
+}
+
+code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 }
 
 a {

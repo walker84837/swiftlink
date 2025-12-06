@@ -3,54 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swiftlink</title>
+    <title>Swiftlink - Your Fast and Efficient URL Shortener</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <!-- Google fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="content">
+    <main>
         <h1>Swiftlink</h1>
+
         <blockquote>
-            <p>blazingly fast and memory-efficient</p>
+            <p>A fast, lightweight, and fully open-source URL shortener built for performance.</p>
         </blockquote>
 
-        <h2>Easy to use, easy to configure.</h2>
-        <p>Swiftlink is an open-source URL shortening service built in Rust using the Actix web framework. It is designed for high performance, security, and minimal memory overhead while offering full customizability.</p>
-
-        <h2>How to use</h2>
-
-        <h3>For server admins</h3>
-        <ol>
-            <li>Clone the repository from GitHub.</li>
-            <li>Install Rust and compile the project.</li>
-            <li>Configure your PostgreSQL database settings in the config file.</li>
-            <li>Run the server and use our simple API to generate short links from long URLs.</li>
-        </ol>
-
-        <h3>For regular users</h3>
-        <p>A client is coming soon, which makes shortening links easier. Documentation for the API is coming soon!</p>
-
-        <h2>Features</h2>
+        <p>Swiftlink makes long URLs shorter and easier to remember. This makes them great for:</p>
         <ul>
-            <li>Quick creation of short links from long URLs.</li>
-            <li>Customizable database support, including PostgreSQL.</li>
-            <li>High performance with low memory usage, thanks to Rust and Actix.</li>
-            <li>Configurable logging and error handling for easy troubleshooting.</li>
+            <li>social media</li>
+            <li>newsletters</li>
+            <li>documentation</li>
+            <li>marketing campaigns</li>
         </ul>
 
-        <h2>Installation</h2>
-        <p>
-            Download the source code from our GitHub repository, install the necessary Rust dependencies, and compile the project. Update your configuration file with your PostgreSQL credentials, then launch the server. Detailed instructions are provided in the documentation.
-        </p>
+        <p>Overall, Swiftlink is useful in situations where a simple link is important.</p>
 
-        <h2>Contributing</h2>
-        <p>
-            Swiftlink is free and open-source. We welcome contributions from the community! Please visit our GitHub repository to review the contribution guidelines and submit pull requests. Help us enhance the project for everyone.
-        </p>
+        <p>Designed with simplicity and speed in mind, Swiftlink provides a URL shortener that you can host yourself without any unnecessary bloat.</p>
 
-        <footer>
-            <p>This is FOSS. Feel free to <a href="https://github.com/walker84837/swiftlink">contribute</a>!</p>
-        </footer>
-    </div>
+        <h2>Why Swiftlink?</h2>
+
+        <p>Swiftlink stands out because it combines performance with a minimal footprint:</p>
+
+        <ul>
+            <li><em>Blazing fast</em> - Written in Rust, Swiftlink handles ~100k requests per second with ease.</li>
+            <li><em>Extremely lightweight</em> - Uses ~8 MB RAM when idle and ~20 MB under load.</li>
+            <li><em>Reliable</em> - Works with both PostgreSQL and SQLite and remains stable even under high traffic.</li>
+            <li><em>Focused and simple</em> - No extra features you don't need – just clean shortening done right.</li>
+        </ul>
+        <p>Whether you're running a personal instance or a high-throughput service, Swiftlink stays responsive and predictable.</p>
+
+        <h2>For developers & self-hosters</h2>
+
+        <p>Swiftlink is <em>free, open-source software</em> with a modular architecture and a clean API.</p>
+
+        <p>It is easy to integrate, extend, and deploy in your own environment.</p>
+
+        <p>A small but capable CLI client is included, so you can create, inspect, and delete links directly from your terminal.</p>
+
+        <p>Explore the full source, API documentation, and contribution guidelines on GitHub:</p>
+
+        <blockquote><a href="https://github.com/walker84837/swiftlink">https://github.com/walker84837/swiftlink</a></blockquote>
+
+        <h2>Databases supported</h2>
+
+        <p>Swiftlink supports:</p>
+
+        <ul>
+            <li>PostgreSQL</li>
+            <li>SQLite</li>
+        </ul>
+
+        <p>Choose the backend that best fits your deployment.</p>
+
+        <h2>Coming soon</h2>
+
+        <ul>
+            <li>A ready-to-use <em>Docker image</em></li>
+            <li>A <code>docker-compose</code> setup for simple self-hosting</li>
+        </ul>
+
+        <footer>Stay tuned: Swiftlink is actively growing.</footer>
+    </main>
 </body>
 </html>
