@@ -4,12 +4,7 @@ use env_logger::Target;
 use log::{LevelFilter, error, info, warn};
 use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
-use sqlx::{
-    postgres::PgPoolOptions,
-    sqlite::SqlitePoolOptions,
-    PgPool,
-    SqlitePool,
-};
+use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
 use std::{
     borrow::Cow,
     fs,
@@ -140,8 +135,7 @@ struct AppState {
 }
 
 /// Initialize the database (create the links table)
-async fn init_db(db_pool: &Pool) -> SwiftlinkResult<()>
-{
+async fn init_db(db_pool: &Pool) -> SwiftlinkResult<()> {
     match db_pool {
         Pool::Postgres(pool) => {
             sqlx::query(
@@ -192,10 +186,7 @@ fn validate_url(input: &str) -> Result<(), &'static str> {
 /// Checks if the URL already exists in the database.
 /// Returns Ok(Some(existing_code)) if found, Ok(None) if not found,
 /// or Err(response) if a database error occurs.
-async fn check_existing_url(
-    db_pool: &Pool,
-    url: &str,
-) -> Result<Option<String>, HttpResponse> {
+async fn check_existing_url(db_pool: &Pool, url: &str) -> Result<Option<String>, HttpResponse> {
     let result = match db_pool {
         Pool::Postgres(pool) => {
             sqlx::query_scalar("SELECT code FROM links WHERE url = $1")
@@ -251,10 +242,7 @@ async fn insert_new_link(
 
 /// Handles the unique constraint conflict by fetching the existing link code.
 /// Returns Ok(response) if successful, or Err(response) if a database error occurs.
-async fn handle_unique_conflict(
-    db_pool: &Pool,
-    url: &str,
-) -> Result<HttpResponse, HttpResponse> {
+async fn handle_unique_conflict(db_pool: &Pool, url: &str) -> Result<HttpResponse, HttpResponse> {
     let result = match db_pool {
         Pool::Postgres(pool) => {
             sqlx::query_scalar("SELECT code FROM links WHERE url = $1")
@@ -314,20 +302,16 @@ async fn delete_link(
 
     let code_to_delete: String = path.into_inner();
     let result = match &state.db_pool {
-        Pool::Postgres(pool) => {
-            sqlx::query("DELETE FROM links WHERE code = $1")
-                .bind(&code_to_delete)
-                .execute(pool)
-                .await
-                .map(|r| r.rows_affected())
-        }
-        Pool::Sqlite(pool) => {
-            sqlx::query("DELETE FROM links WHERE code = $1")
-                .bind(&code_to_delete)
-                .execute(pool)
-                .await
-                .map(|r| r.rows_affected())
-        }
+        Pool::Postgres(pool) => sqlx::query("DELETE FROM links WHERE code = $1")
+            .bind(&code_to_delete)
+            .execute(pool)
+            .await
+            .map(|r| r.rows_affected()),
+        Pool::Sqlite(pool) => sqlx::query("DELETE FROM links WHERE code = $1")
+            .bind(&code_to_delete)
+            .execute(pool)
+            .await
+            .map(|r| r.rows_affected()),
     };
     info!("Deleting code: {code_to_delete}");
 
