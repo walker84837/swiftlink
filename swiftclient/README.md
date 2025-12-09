@@ -8,13 +8,6 @@ swiftclient is a command-line interface (CLI) tool for interacting with the Swif
 - and delete links
 all from the comfort of their terminal.
 
-## Features
-
-As listed before:
-- **Create shortened links**: Shorten long URLs into concise, shareable Swiftlink codes.
-- **Get link information**: Retrieve the original URL and creation timestamp for any Swiftlink code.
-- **Delete short links**: Remove unwanted short links from the Swiftlink service (requires authentication, of course).
-
 ## Usage
 
 swiftclient requires a `--base-url` argument to specify the address of the Swiftlink server it should connect to.

@@ -7,13 +7,15 @@ Swiftlink is a modular URL shortening service built with Rust. It consists of th
 - a core API definition and client SDK (`swiftlink-api`);
 - and a command-line interface (`swiftclient`).
 
-Swiftlink aims for high performance, security, and full customizability, backed by PostgreSQL (or SQLite) for data persistence. It's **easy to use, easy to configure.**
+Swiftlink aims for high performance, security, and full customizability, backed by PostgreSQL (or SQLite) for data persistence. It's **easy to use**, **easy to configure**.
+
+We have a website up and running at <https://walker84837.github.io/swiftlink>, where you can find more information about the project and how to get started.
 
 ## Project Structure
 
-* `swiftlink-api`Defines the shared API contract and provides both asynchronous (`async`) and blocking (`blocking`) HTTP client implementations for interacting with the Swiftlink server. This crate serves as the single source of truth for API request and response types.
-* `swiftlink-server`An `actix-web` based HTTP server that implements the core URL shortening logic. It handles API requests, interacts with a PostgreSQL database via `sqlx`, and provides redirection functionality.
-* `swiftclient`A command-line tool built with `clap` that utilizes the `swiftlink-api`'s blocking client to easily create, query, and delete short links from your terminal.
+* `swiftlink-api`: Defines the shared API contract and provides both asynchronous (`async`) and blocking (`blocking`) HTTP client implementations for interacting with the Swiftlink server. This crate serves as the single source of truth for API request and response types.
+* `swiftlink-server`: An `actix-web` based HTTP server that implements the core URL shortening logic. It handles API requests, interacts with a PostgreSQL database via `sqlx`, and provides redirection functionality.
+* `swiftclient`: A command-line tool built with `clap` that utilizes the `swiftlink-api`'s blocking client to easily create, query, and delete short links from your terminal.
 
 ## Features
 
@@ -28,13 +30,13 @@ Swiftlink aims for high performance, security, and full customizability, backed 
 
 To get Swiftlink up and running locally, follow these steps:
 
-1.  **Clone the repository:**
+1.  **Clone the repository**:
     ```sh
     git clone https://github.com/walker84837/swiftlink.git
     cd swiftlink
     ```
 
-2.  **Database Setup:**
+2.  **Database Setup**:
     Swiftlink uses PostgreSQL (you can also configure it to use SQLite). Ensure you have one of these databases installed.
     For PostgreSQL, create a database (e.g., `swiftlink_db`) and a user with appropriate permissions.
     You can configure database connection details in `example/config.toml`.
@@ -45,14 +47,14 @@ To get Swiftlink up and running locally, follow these steps:
   ```
   This command will build all three crates (`swiftlink-api`, `swiftlink-server`, `swiftclient`).
 
-4.  **Run the Swiftlink server:**
+4.  **Run the Swiftlink server**:
   ```sh
   ./target/release/swiftlink-server --config example/config.toml
   ```
   The server will start on the port specified in your `config.toml` (default 8080).
   You can then access the API at `http://localhost:8080`.
 
-5.  **Use the Swiftclient CLI:**
+5.  **Use the Swiftclient CLI**:
   ```sh
   # Create a short link
   ./target/release/swiftclient create --url "https://www.google.com"
