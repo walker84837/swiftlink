@@ -1,0 +1,27 @@
+name: Build and Deploy mdBook Docs to VPS
+
+on:
+  push:
+    branches:
+      - pages
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Deploy to VPS over SSH
+      - name: Deploy Book to VPS
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: actions
+          key: ${{ secrets.VPS_PRIV_KEY }}
+          port: 22
+          source: "."
+          target: "/home/actions/swiftlink/contents"
+          rm: true
