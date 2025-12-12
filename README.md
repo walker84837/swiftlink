@@ -9,7 +9,7 @@ Swiftlink is a modular URL shortening service built with Rust. It consists of th
 
 Swiftlink aims for high performance, security, and full customizability, backed by PostgreSQL (or SQLite) for data persistence. It's **easy to use**, **easy to configure**.
 
-We have a website up and running at <https://walker84837.github.io/swiftlink>, where you can find more information about the project and how to get started.
+We have a website up and running at <https://swiftlink.wiki>, where you can find more information about the project and how to get started.
 
 ## Project Structure
 
