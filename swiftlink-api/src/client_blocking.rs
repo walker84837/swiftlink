@@ -3,6 +3,10 @@ use crate::{
 };
 use reqwest::blocking::Client;
 
+/// A blocking client for interacting with the Swiftlink URL shortening service.
+///
+/// This client provides methods to create, retrieve information about, and redirect short links
+/// using a blocking API.
 #[derive(Debug, Clone)]
 pub struct SwiftlinkClient {
     client: Client,
@@ -19,6 +23,8 @@ impl SwiftlinkClient {
     }
 
     /// Calls the `/api/create` endpoint to create a short link.
+    ///
+    /// Returns a [`SwiftlinkResult`] containing a [`CreateLinkResponse`] on success.
     pub fn create_link(&self, url: impl AsRef<str>) -> SwiftlinkResult<CreateLinkResponse> {
         let req_body = CreateLinkRequest {
             url: url.as_ref().to_string(),
@@ -37,6 +43,8 @@ impl SwiftlinkClient {
     }
 
     /// Calls the `/api/info/{code}` endpoint to retrieve link info.
+    ///
+    /// Returns a [`SwiftlinkResult`] containing an [`InfoResponse`] on success.
     pub fn get_link_info(&self, code: impl AsRef<str>) -> SwiftlinkResult<InfoResponse> {
         let resp = self
             .client
@@ -53,6 +61,7 @@ impl SwiftlinkClient {
     /// Calls the `/{code}` endpoint to get the redirection URL.
     ///
     /// Assumes that the server returns a "Location" header on redirection.
+    /// Returns an error when the header is not found, or a [`SwiftlinkResult`] containing the redirection URL (`String`).
     pub fn redirect(&self, code: impl AsRef<str>) -> SwiftlinkResult<String> {
         let resp = self
             .client
@@ -75,6 +84,8 @@ impl SwiftlinkClient {
     }
 
     /// Calls the `/{code}` endpoint to delete a short link.
+    ///
+    /// Returns a [`SwiftlinkResult`] indicating success or failure.
     pub fn delete_link(
         &self,
         code: impl AsRef<str>,

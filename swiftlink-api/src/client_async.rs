@@ -2,6 +2,10 @@ use crate::request_types::*;
 use crate::{SwiftlinkClientError, SwiftlinkResult};
 use reqwest::Client;
 
+/// An asynchronous client for interacting with the Swiftlink URL shortening service.
+///
+/// This client provides methods to create, retrieve information about, and redirect short links
+/// using an `async` runtime.
 #[derive(Debug, Clone)]
 pub struct SwiftlinkClient {
     client: Client,
@@ -19,6 +23,8 @@ impl SwiftlinkClient {
     }
 
     /// Calls the `/api/create` endpoint to create a short link.
+    ///
+    /// Returns a [`SwiftlinkResult`] containing a [`CreateLinkResponse`] on success.
     pub async fn create_link(&self, url: impl AsRef<str>) -> SwiftlinkResult<CreateLinkResponse> {
         let final_url = url.as_ref();
         let req_body = CreateLinkRequest {
@@ -40,6 +46,8 @@ impl SwiftlinkClient {
     }
 
     /// Calls the `/api/info/{code}` endpoint to retrieve link info.
+    ///
+    /// Returns a [`SwiftlinkResult`] containing an [`InfoResponse`] on success.
     pub async fn get_link_info(&self, code: impl AsRef<str>) -> SwiftlinkResult<InfoResponse> {
         let resp = self
             .client
@@ -58,7 +66,7 @@ impl SwiftlinkClient {
     /// Calls the `/{code}` endpoint to get the redirection URL.
     ///
     /// The server should return a "Location" header on redirection.
-    /// Returns an error when the header is not found.
+    /// Returns an error when the header is not found, or a [`SwiftlinkResult`] containing the redirection URL (`String`).
     pub async fn redirect(&self, code: impl AsRef<str>) -> SwiftlinkResult<String> {
         let resp = self
             .client
