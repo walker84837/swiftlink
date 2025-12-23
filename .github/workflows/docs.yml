@@ -14,14 +14,26 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Build MkDocs
+        run: |
+          pip install mkdocs mkdocs-material
+          mkdocs build --config-file docs/mkdocs.yml
+
+      - name: Assemble site
+        run: |
+          rm -rf dist
+          mkdir -p dist/d
+          cp -r site/* dist/
+          cp -r public/docs/* dist/d/
+
       # Deploy to VPS over SSH
-      - name: Deploy Book to VPS
+      - name: Deploy to VPS
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.VPS_IP }}
           username: actions
           key: ${{ secrets.VPS_PRIV_KEY }}
           port: 22
-          source: "."
+          source: "dist/*"
           target: "/home/actions/swiftlink/contents"
           rm: true

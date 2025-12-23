@@ -1,0 +1,25 @@
+site_name: Swiftlink Documentation
+site_url: https://swiftlink.wiki/d/
+
+docs_dir: content
+site_dir: ../public/docs
+
+theme:
+  name: material
+  palette:
+    primary: deep orange
+    accent: deep orange
+    scheme: slate
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Server:
+      - Setup: server/setup.md
+      - Configuration: server/configuration.md
+  - CLI: cli/swiftclient.md
+  - API:
+      - Overview: api/index.md
+      - Endpoints: api/endpoints.md
+  - Contributing: contributing.md
+  - Roadmap: roadmap.md
