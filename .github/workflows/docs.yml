@@ -34,6 +34,6 @@ jobs:
           username: actions
           key: ${{ secrets.VPS_PRIV_KEY }}
           port: 22
-          source: "dist/*"
-          target: "/home/actions/swiftlink/contents"
+          source: "dist/"
+          target: "/home/actions/swiftlink"
           rm: true
