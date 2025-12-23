@@ -18,7 +18,7 @@ Clone the repository and build the workspace:
 
 ```sh
 cargo build --workspace
-````
+```
 
 ## Code structure
 

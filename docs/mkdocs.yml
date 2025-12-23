@@ -4,12 +4,32 @@ site_url: https://swiftlink.wiki/d/
 docs_dir: content
 site_dir: ../public/docs
 
+repo_url: https://github.com/walker84837/swiftlink
+repo_name: walker84837/swiftlink
+
 theme:
   name: material
   palette:
     primary: deep orange
     accent: deep orange
     scheme: slate
+  features:
+    - navigation.footer
+    - navigation.instant
+    - navigation.expand
+    - navigation.path
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.highlight
+  - pymdownx.keys
 
 nav:
   - Home: index.md

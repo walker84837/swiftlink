@@ -14,10 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build MkDocs
+      - name: Build MkDocs and Dependencies
         run: |
-          pip install mkdocs mkdocs-material
+          pip install mkdocs mkdocs-material pymdown-extensions
           mkdocs build --config-file docs/mkdocs.yml
+
 
       - name: Assemble site
         run: |
