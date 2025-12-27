@@ -1,4 +1,4 @@
-name: Build and Deploy mdBook Docs to VPS
+name: Build and Deploy MkDocs to VPS
 
 on:
   push:
@@ -19,7 +19,6 @@ jobs:
           pip install mkdocs mkdocs-material pymdown-extensions
           mkdocs build --config-file docs/mkdocs.yml
 
-
       - name: Assemble site
         run: |
           rm -rf dist
@@ -27,7 +26,12 @@ jobs:
           cp -r site/* dist/
           cp -r public/docs/* dist/d/
 
-      # Deploy to VPS over SSH
+      # TODO: remove this once the issue is fixed
+      - name: Test TCP reachability
+        run: |
+          nc -vz ${{ secrets.VPS_IP }} 22
+
+      # Deploy to VPS using manual scp
       - name: Deploy to VPS
         uses: appleboy/scp-action@v1
         with:
