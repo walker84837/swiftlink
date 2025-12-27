@@ -1,4 +1,4 @@
-name: Build and Deploy mdBook Docs to VPS
+name: Build and Deploy MkDocs to VPS
 
 on:
   push:
@@ -19,7 +19,6 @@ jobs:
           pip install mkdocs mkdocs-material pymdown-extensions
           mkdocs build --config-file docs/mkdocs.yml
 
-
       - name: Assemble site
         run: |
           rm -rf dist
@@ -27,14 +26,27 @@ jobs:
           cp -r site/* dist/
           cp -r public/docs/* dist/d/
 
-      # Deploy to VPS over SSH
+      # TODO: remove this once the issue is fixed
+      - name: Test TCP reachability
+        run: |
+          nc -vz ${{ secrets.VPS_IP }} 22
+
+      # Deploy to VPS using manual scp
       - name: Deploy to VPS
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.VPS_IP }}
-          username: actions
-          key: ${{ secrets.VPS_PRIV_KEY }}
-          port: 22
-          source: "dist/"
-          target: "/home/actions/swiftlink"
-          rm: true
+        env:
+          VPS_IP: ${{ secrets.VPS_IP }}
+          VPS_USER: actions
+          VPS_KEY: ${{ secrets.VPS_PRIV_KEY }}
+        run: |
+          printf '%s\n' "$VPS_KEY" > private_key
+          chmod 600 private_key
+      
+          tar -C dist -cf - . | ssh \
+            -i private_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            $VPS_USER@$VPS_IP \
+            'mkdir -p /home/actions/swiftlink && tar -C /home/actions/swiftlink -xf -'
+      
+          rm private_key
