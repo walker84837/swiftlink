@@ -86,11 +86,13 @@ For the sake of running the server the first time, we'll use the default one:
 ```
 
 The config.toml file provides a very simple configuration that's perfect for getting started quickly. It contains fundamental server settings like:
+
   * The number of characters for generated short codes;
   * The network port the server will listen on (default is 8080); If this port is already in use, you can change it in the config.toml file.
   * A simple token for authenticating API requests, primarily for actions like deleting links.
 
 It also contains configuration for the database the defaults are:
+
    * SQLite database in "swiftlink.db" in the server's working directory.
 
 **Try it out with the CLI**:
