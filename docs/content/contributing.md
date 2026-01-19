@@ -1,35 +1,233 @@
 # Contributing to Swiftlink
 
-Swiftlink is free and open-source software, and contributions are welcome.
+Swiftlink is free and open-source software, and contributions are welcome! This guide will help you get started with contributing to the project.
 
-## Ways to contribute
+## Ways to Contribute
 
-- Reporting bugs
-- Improving documentation
-- Implementing new features
-- Refactoring and cleanup
+You can contribute to Swiftlink in multiple ways. This section will list a few ways and examples of what to ... .
 
-## Development setup
+## Non-code changes
 
-- Rust stable
-- PostgreSQL or SQLite
+### Improving Documentation
 
-Clone the repository and build the workspace:
+Contributions to Swiftlink don't need to be code-related: they can also be documentation-related.
 
-```sh
-cargo build --workspace
+- Fix typos and grammatical errors
+- Add missing examples
+- Improve explanation of concepts
+- Update outdated information
+- Styling and readability improvements
+
+### Code-related changes
+
+#### Reporting Bugs
+
+- Use the [GitHub issue tracker](https://github.com/walker84837/swiftlink/issues)
+- Include:
+  - Swiftlink version
+  - Operating system and Rust version
+  - Steps to reproduce
+  - Expected vs actual behavior
+  - Any relevant logs or configuration
+
+### Implementing New Features
+
+1. Open an issue to discuss the proposed feature
+2. Get feedback from maintainers
+3. Follow the implementation guidelines below
+4. Submit a pull request
+
+### Refactoring and Cleanup
+
+- Improve code organization
+- Optimize performance
+- Remove deprecated code
+- Enhance error handling
+
+## Development Setup
+
+### Prerequisites
+- **Rust** 1.85.0 or later
+- **Database**: PostgreSQL or SQLite
+- **Git**
+
+### Getting Started
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/walker84837/swiftlink.git
+   cd swiftlink
+   ```
+
+2. **Set up the development environment**:
+   ```bash
+   # Install Rust toolchain
+   rustup update stable
+   rustup component add rustfmt clippy
+   
+   # Build the workspace
+   cargo build --workspace
+   ```
+
+3. **Run tests**:
+   ```bash
+   cargo test --workspace
+   ```
+
+4. **Check formatting**:
+   ```bash
+   cargo fmt --all --check
+   ```
+
+5. **Run clippy**:
+   ```bash
+   cargo clippy --workspace
+   ```
+
+### Database Setup for Development
+
+For testing with a local database:
+
+**PostgreSQL**:
+TODO
+
+**SQLite**:
+TODO
+
+```bash
+export DATABASE_URL="sqlite://..."
 ```
 
-## Code structure
+## Code Structure
 
-* `swiftlink-server` — HTTP server and business logic
-* `swiftlink-api` — shared API types and client
-* `swiftclient` — command-line interface
+Swiftlink is organized as a Cargo workspace with three main crates:
 
-## Pull requests
+### `swiftlink-server` - HTTP Server
 
-* Keep changes focused
-* Run formatting and tests
-* Describe *why* the change exists
+TODO
 
-If in doubt, open an issue first to discuss ideas.
+### `swiftlink-api` - Shared Library
+
+TODO
+
+### `swiftclient` - CLI Tool
+
+TODO
+
+## Development Guidelines
+
+### Code Style
+- Follow Rust's standard formatting (`cargo fmt`)
+- Use `cargo clippy` for linting
+- Write clear, descriptive variable and function names
+- Add comments for complex logic
+- Document public APIs with `///` doc comments
+
+### Testing
+
+- Write unit tests for new functionality where applicable
+- Integration tests should cover API endpoints
+- Ensure all tests pass before submitting PR
+- Use `cargo test --workspace` to run all tests
+
+### Commit Messages
+
+Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Examples**:
+- `feat(api): add bulk endpoint for creating multiple links`
+- `fix: handle database connection errors gracefully`
+- `docs(cli): update installation instructions`
+- `refactor(client): remove duplicate code in error handling`
+
+## Pull Request Process
+
+### Before Submitting
+
+1. **Create a new branch** from `main`:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make your changes** and ensure they follow the guidelines
+
+3. **Run all checks**:
+   ```bash
+   cargo fmt --all
+   cargo clippy --workspace -- -D warnings
+   cargo test --workspace
+   ```
+
+4. **Update documentation** if needed
+
+### Submitting the PR
+1. **Push your branch**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+2. **Create a pull request** with:
+   - Clear title describing the change
+   - Detailed description of *why* the change is needed
+   - Steps to test (if applicable)
+   - Any breaking changes or migration notes
+
+3. **Link any related issues** in the PR description
+
+### PR Review Process
+- All PRs require at least one review
+- Address feedback promptly
+- Keep discussion focused and constructive
+- Maintainers may request changes before merge
+
+## Bug Fix Process
+
+1. **Reproduce the bug** with minimal steps
+2. **Add a test** that fails before the fix
+3. **Implement the fix**
+4. **Ensure all tests pass**
+5. **Update documentation** if behavior changed
+6. **Submit PR** with `fix:` prefix
+
+## Feature Development
+
+1. **Open an issue** to discuss the feature idea
+2. **Get consensus** on the approach
+3. **Break down** into smaller tasks if needed
+4. **Implement incrementally**
+5. **Test thoroughly**
+6. **Update documentation**
+7. **Submit PR** with `feat:` prefix
+
+## Performance Considerations
+
+- **Database queries**: Optimize for common use cases
+- **Memory usage**: Be mindful of large URL lists
+- **Concurrency**: Consider thread safety in shared code
+- **Error handling**: Don't let performance degrade on errors
+
+## Security Considerations
+
+- **Input validation**: Always validate external input
+- **Authentication**: Never expose tokens or secrets
+- **SQL injection**: Use parameterized queries (SQLx handles this)
+- **Rate limiting**: Consider for public deployments
+
+## Getting Help
+
+- **GitHub Issues**: For bugs and feature requests
+- **GitHub Discussions**: For general questions
+- **Documentation**: Check existing docs first
+- **Code Comments**: Read inline documentation
+
+## License
+
+By contributing to Swiftlink, you agree that your contributions will be licensed under the same license as the project (Apache-2.0 OR MIT).

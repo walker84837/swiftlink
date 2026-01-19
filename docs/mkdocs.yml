@@ -33,6 +33,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Installation: installation.md
   - Getting started: getting-started.md
   - Server:
       - Setup: server/setup.md
@@ -41,5 +42,7 @@ nav:
   - API:
       - Overview: api/index.md
       - Endpoints: api/endpoints.md
+  - Examples: examples.md
+  - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
   - Roadmap: roadmap.md

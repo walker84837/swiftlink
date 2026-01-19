@@ -102,7 +102,7 @@ With the server running, you can now use the `swiftclient` utility to interact w
 Open another terminal window, while keeping the server running.
 
 ```sh
-./target/release/swiftclient create --url https://example.com --base-url http://localhost:8080
+./target/release/swiftclient --base-url http://localhost:8080 create https://example.com
 ```
 
 This creates a new shortened URL which redirects to <https://example.com>, sending a your local "demo" server (`http://localhost:8080`) to create a link.
