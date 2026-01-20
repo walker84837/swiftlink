@@ -146,6 +146,7 @@ Follow the [Conventional Commits](https://conventionalcommits.org/) specificatio
 ```
 
 **Examples**:
+
 - `feat(api): add bulk endpoint for creating multiple links`
 - `fix: handle database connection errors gracefully`
 - `docs(cli): update installation instructions`
