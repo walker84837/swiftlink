@@ -41,8 +41,8 @@ nav:
   - CLI: cli/swiftclient.md
   - API:
       - Overview: api/index.md
+      - Client SDK: api/sdk.md
       - Endpoints: api/endpoints.md
-  - Examples: examples.md
   - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
   - Roadmap: roadmap.md

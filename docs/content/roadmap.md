@@ -4,8 +4,8 @@ This document outlines planned improvements and long-term goals.
 
 ## Functionality
 
-- Authentication for link creation
-- Complete async client support
+- Optional authentication for link creation set in the server's config
+- Complete client support
 - Improved error handling
 
 ## Deployment
@@ -14,7 +14,6 @@ This document outlines planned improvements and long-term goals.
 - docker-compose examples
 
 This roadmap is subject to change.
-
 
 ## Roadmap
 
@@ -26,6 +25,8 @@ This roadmap is subject to change.
 * [ ] Improve error handling and provide more descriptive error responses.
 * Landing page:
   * [ ] Simple install with `curl` command and `install.sh` file.
+* [ ] Rate limiting
+* [ ] CORS headers
 
 ### Look and feel
 
