@@ -4,13 +4,13 @@ Swiftlink is free and open-source software, and contributions are welcome! This 
 
 ## Ways to Contribute
 
-You can contribute to Swiftlink in multiple ways. This section will list a few ways and examples of what to ... .
+There's mulitple ways you can contribute to Swiftlink. This section will list a few ways to do so, along with some examples of contributions for every category.
 
 ## Non-code changes
 
-### Improving Documentation
+If you're not a developer or know Rust, contributions to Swiftlink don't need to be code-related.
 
-Contributions to Swiftlink don't need to be code-related: they can also be documentation-related.
+### Improving Documentation
 
 - Fix typos and grammatical errors
 - Add missing examples
@@ -18,17 +18,7 @@ Contributions to Swiftlink don't need to be code-related: they can also be docum
 - Update outdated information
 - Styling and readability improvements
 
-### Code-related changes
-
-#### Reporting Bugs
-
-- Use the [GitHub issue tracker](https://github.com/walker84837/swiftlink/issues)
-- Include:
-  - Swiftlink version
-  - Operating system and Rust version
-  - Steps to reproduce
-  - Expected vs actual behavior
-  - Any relevant logs or configuration
+## Code-related changes
 
 ### Implementing New Features
 
@@ -44,14 +34,15 @@ Contributions to Swiftlink don't need to be code-related: they can also be docum
 - Remove deprecated code
 - Enhance error handling
 
-## Development Setup
+### Development Setup
 
-### Prerequisites
+#### Prerequisites
+
 - **Rust** 1.85.0 or later
 - **Database**: PostgreSQL or SQLite
 - **Git**
 
-### Getting Started
+#### Getting Started
 
 1. **Clone the repository**:
    ```bash
@@ -84,7 +75,7 @@ Contributions to Swiftlink don't need to be code-related: they can also be docum
    cargo clippy --workspace
    ```
 
-### Database Setup for Development
+#### Database Setup for Development
 
 For testing with a local database:
 
@@ -97,6 +88,16 @@ TODO
 ```bash
 export DATABASE_URL="sqlite://..."
 ```
+
+#### Reporting Bugs
+
+- Use the [GitHub issue tracker](https://github.com/walker84837/swiftlink/issues)
+- Include:
+  - Swiftlink version
+  - Operating system and Rust version
+  - Steps to reproduce
+  - Expected vs actual behavior
+  - Any relevant logs or configuration
 
 ## Code Structure
 
@@ -117,11 +118,13 @@ TODO
 ## Development Guidelines
 
 ### Code Style
+
 - Follow Rust's standard formatting (`cargo fmt`)
 - Use `cargo clippy` for linting
 - Write clear, descriptive variable and function names
 - Add comments for complex logic
 - Document public APIs with `///` doc comments
+- Avoid `.unwrap()` and `.expect()` and actaully handle errors.
 
 ### Testing
 
@@ -132,7 +135,7 @@ TODO
 
 ### Commit Messages
 
-Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+Follow the [Conventional Commits](https://conventionalcommits.org/) specification:
 
 ```
 <type>[optional scope]: <description>
@@ -169,6 +172,7 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 4. **Update documentation** if needed
 
 ### Submitting the PR
+
 1. **Push your branch**:
    ```bash
    git push origin feature/your-feature-name
@@ -182,13 +186,7 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 
 3. **Link any related issues** in the PR description
 
-### PR Review Process
-- All PRs require at least one review
-- Address feedback promptly
-- Keep discussion focused and constructive
-- Maintainers may request changes before merge
-
-## Bug Fix Process
+## Proposing Bug Fixes
 
 1. **Reproduce the bug** with minimal steps
 2. **Add a test** that fails before the fix
@@ -207,19 +205,21 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 6. **Update documentation**
 7. **Submit PR** with `feat:` prefix
 
-## Performance Considerations
+## Considerations When Adding Features
 
-- **Database queries**: Optimize for common use cases
-- **Memory usage**: Be mindful of large URL lists
-- **Concurrency**: Consider thread safety in shared code
-- **Error handling**: Don't let performance degrade on errors
+### Performance
 
-## Security Considerations
+- Optimize for common use cases
+- Be mindful of large URL lists
+- Consider thread safety in shared code
+- Don't let performance degrade on errors
 
-- **Input validation**: Always validate external input
-- **Authentication**: Never expose tokens or secrets
-- **SQL injection**: Use parameterized queries (SQLx handles this)
-- **Rate limiting**: Consider for public deployments
+### Security
+
+- Always validate external input
+- Never expose tokens or secrets
+- Use parameterized queries (SQLx handles this)
+- Consider for public deployments
 
 ## Getting Help
 

@@ -5,8 +5,8 @@ This document outlines planned improvements and long-term goals.
 ## Functionality
 
 - Optional authentication for link creation set in the server's config
-- Complete client support
-- Improved error handling
+- Complete client SDK support
+- Improve error handling
 
 ## Deployment
 
