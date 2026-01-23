@@ -3,7 +3,7 @@ use clap::{Parser, ValueHint};
 use env_logger::Target;
 use log::{LevelFilter, error, info, warn};
 use rand::{Rng, distr::Alphanumeric};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
 use std::{
     borrow::Cow,
@@ -14,6 +14,7 @@ use std::{
 };
 use url::Url;
 
+use swiftlink_api::{CreateLinkRequest, CreateLinkResponse, InfoResponse};
 use thiserror::Error;
 
 type SwiftlinkResult<T> = Result<T, ServerError>;
@@ -102,24 +103,6 @@ impl Default for Config {
             },
         }
     }
-}
-
-#[derive(Serialize, sqlx::FromRow)]
-struct InfoResponse {
-    code: String,
-    created_at: i64,
-    url: String,
-}
-
-#[derive(Deserialize)]
-struct CreateLinkRequest {
-    url: String,
-}
-
-#[derive(Serialize)]
-struct CreateLinkResponse {
-    code: String,
-    url: String,
 }
 
 #[derive(Clone)]
@@ -527,7 +510,7 @@ async fn main() -> SwiftlinkResult<()> {
                 .expect("Database path must be specified for SQLite");
             let pool = SqlitePoolOptions::new()
                 .max_connections(db_config.max_connections.unwrap_or(5))
-                .connect(&database_url)
+                .connect(database_url)
                 .await
                 .expect("Failed to create database pool.");
             Pool::Sqlite(pool)
