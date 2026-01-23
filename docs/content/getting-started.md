@@ -35,8 +35,8 @@ cargo --version
 
 If you don't know what SQLite or PostgreSQL are:
 
-  * SQLite is a simple file-based, self-contained database, and requires no configuration.
-  * PostgreSQL is a powerful relational database, better-suited for production environments. Going this route requires more configuration.
+* SQLite is a simple file-based, self-contained database, and requires no configuration.
+* PostgreSQL is a powerful relational database, better-suited for production environments. Going this route requires more configuration.
 
 ### Installation
 
@@ -109,7 +109,7 @@ This creates a new shortened URL which redirects to <https://example.com>, sendi
 
 The server will generate a unique short code for your URL, your client will receive it and print it to the console.
 
-**Visit your Short Link**:
+**Visit your short link**:
 
 Finally, you can test your newly created short link by visiting it in your web browser.
 
