@@ -1,13 +1,18 @@
-use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use clap::{Parser, ValueHint};
 use env_logger::Target;
-use log::{LevelFilter, error, info, warn};
-use rand::{Rng, distr::Alphanumeric};
-use serde::Deserialize;
-use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
+use governor::{
+    clock::QuantaClock,
+    state::{InMemoryState, NotKeyed},
+    Quota, RateLimiter,
+};
+use log::{error, info, warn, LevelFilter};
+use rand::{distr::Alphanumeric, RngExt};
+use sqlx::{postgres::PgPoolOptions, sqlite::SqlitePoolOptions, PgPool, SqlitePool};
 use std::{
     borrow::Cow,
     fs,
+    num::NonZeroU32,
     path::PathBuf,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -18,6 +23,10 @@ use swiftlink_api::{CreateLinkRequest, CreateLinkResponse, InfoResponse};
 use thiserror::Error;
 
 type SwiftlinkResult<T> = Result<T, ServerError>;
+
+mod config;
+
+use crate::config::{Config, DatabaseType};
 
 #[derive(Debug, Error)]
 enum ServerError {
@@ -36,75 +45,6 @@ fn generate_random_code(code_size: usize) -> String {
         .collect()
 }
 
-/// Server configuration, comprising of base options and database configuration
-#[derive(Deserialize)]
-struct Config {
-    /// Base options
-    base: BaseOptions,
-    /// Database configuration details
-    database: DatabaseConfig,
-}
-
-/// Base options, for the web server and core functionality
-#[derive(Deserialize)]
-struct BaseOptions {
-    /// Code length for generated short links, default is 6 if not provided
-    code_size: Option<usize>,
-    /// Port for the web server to listen on
-    port: Option<u16>,
-    /// (Optional) 10‐character alphanumeric bearer token for DELETE.
-    /// If omitted, we generate one at startup and log it.
-    bearer_token: Option<String>,
-}
-
-#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum DatabaseType {
-    Postgres,
-    Sqlite,
-}
-
-/// Database-specific configuration
-#[derive(Deserialize)]
-struct DatabaseConfig {
-    #[serde(default = "default_database_type")]
-    database_type: DatabaseType,
-    username: Option<String>,
-    password: Option<String>,
-    /// Optional host (default "localhost")
-    host: Option<String>,
-    /// Optional port (default 5432)
-    port: Option<u16>,
-    /// Optional database name (default "swiftlink_db")
-    database: Option<String>,
-    max_connections: Option<u32>,
-}
-
-fn default_database_type() -> DatabaseType {
-    DatabaseType::Postgres
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            base: BaseOptions {
-                code_size: Some(6),
-                port: Some(8080),
-                bearer_token: None,
-            },
-            database: DatabaseConfig {
-                database_type: DatabaseType::Postgres,
-                username: Some("postgres".into()),
-                password: Some("password".into()),
-                host: Some("localhost".into()),
-                port: Some(5432),
-                database: Some("swiftlink_db".into()),
-                max_connections: Some(5),
-            },
-        }
-    }
-}
-
 #[derive(Clone)]
 enum Pool {
     Postgres(PgPool),
@@ -115,6 +55,7 @@ enum Pool {
 struct AppState {
     db_pool: Pool,
     config: Arc<Config>,
+    rate_limiter: RateLimitMiddleware,
 }
 
 /// Initialize the database (create the links table)
@@ -261,6 +202,11 @@ async fn delete_link(
     path: web::Path<String>,
     req: HttpRequest,
 ) -> impl Responder {
+    // Rate limiting check
+    if let Err(response) = state.rate_limiter.check_rate_limit(None) {
+        return response;
+    }
+
     let configured_token = match &state.config.base.bearer_token {
         Some(tok) => tok.clone(),
         None => {
@@ -321,7 +267,13 @@ async fn delete_link(
 async fn create_link(
     state: web::Data<AppState>,
     req: web::Json<CreateLinkRequest>,
+    _http_req: HttpRequest,
 ) -> impl Responder {
+    // Rate limiting check
+    if let Err(response) = state.rate_limiter.check_rate_limit(None) {
+        return response;
+    }
+
     // Input Validation
     if let Err(e) = validate_url(&req.url) {
         return HttpResponse::BadRequest().body(e);
@@ -386,7 +338,16 @@ struct LinkInfo {
 }
 
 /// API Handler: Get link info (given a code)
-async fn get_link_info(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
+async fn get_link_info(
+    state: web::Data<AppState>,
+    path: web::Path<String>,
+    _http_req: HttpRequest,
+) -> impl Responder {
+    // Rate limiting check
+    if let Err(response) = state.rate_limiter.check_rate_limit(None) {
+        return response;
+    }
+
     let code = path.into_inner();
     let result = match &state.db_pool {
         Pool::Postgres(pool) => {
@@ -417,7 +378,16 @@ async fn get_link_info(state: web::Data<AppState>, path: web::Path<String>) -> i
 }
 
 /// Handler for redirection: given a code, look up the original URL and redirect.
-async fn redirect(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
+async fn redirect(
+    state: web::Data<AppState>,
+    path: web::Path<String>,
+    _http_req: HttpRequest,
+) -> impl Responder {
+    // Rate limiting check
+    if let Err(response) = state.rate_limiter.check_rate_limit(None) {
+        return response;
+    }
+
     let code = path.into_inner();
     let result = match &state.db_pool {
         Pool::Postgres(pool) => {
@@ -441,6 +411,46 @@ async fn redirect(state: web::Data<AppState>, path: web::Path<String>) -> impl R
         Err(e) => {
             error!("Error fetching link: {:?}", e);
             HttpResponse::NotFound().body("Link not found")
+        }
+    }
+}
+
+/// Rate limiting middleware using in-memory storage
+#[derive(Clone)]
+struct RateLimitMiddleware {
+    limiter: Arc<RateLimiter<NotKeyed, InMemoryState, QuantaClock>>,
+    enabled: bool,
+}
+
+impl RateLimitMiddleware {
+    fn new(max_requests: u32, window_seconds: u64, enabled: bool) -> Self {
+        // Calculate requests per second as a NonZeroU32
+        let requests_per_second = if window_seconds > 0 {
+            (max_requests as f64 / window_seconds as f64).ceil() as u32
+        } else {
+            max_requests
+        };
+
+        // SAFETY: max() ensures the value is at least 1, so this cannot panic
+        let max_burst = NonZeroU32::new(requests_per_second.max(1)).unwrap();
+        let quota = Quota::per_second(max_burst);
+        let limiter = Arc::new(RateLimiter::direct(quota));
+
+        Self { limiter, enabled }
+    }
+
+    fn check_rate_limit(&self, _client_ip: Option<&str>) -> Result<(), HttpResponse> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        // TODO: add per-IP rate limiting
+        match self.limiter.check() {
+            Ok(_) => Ok(()),
+            Err(_) => Err(HttpResponse::TooManyRequests().json(serde_json::json!({
+                "error": "Rate limit exceeded",
+                "message": "Too many requests. Please try again later."
+            }))),
         }
     }
 }
@@ -484,6 +494,7 @@ async fn main() -> SwiftlinkResult<()> {
     let db_config = &config.database;
 
     let db_pool = match db_config.database_type {
+        // TODO: move database url logic to fn DatabaseConfig::database_url
         DatabaseType::Postgres => {
             let database_url = format!(
                 "postgres://{}:{}@{}:{}/{}",
@@ -522,9 +533,20 @@ async fn main() -> SwiftlinkResult<()> {
         return Err(e);
     }
 
+    // Create rate limiter from configuration
+    let rate_limit_config = config.base.rate_limit.as_ref();
+    let rate_limiter = RateLimitMiddleware::new(
+        rate_limit_config.and_then(|c| c.max_requests).unwrap_or(10),
+        rate_limit_config
+            .and_then(|c| c.window_seconds)
+            .unwrap_or(60),
+        rate_limit_config.and_then(|c| c.enabled).unwrap_or(true),
+    );
+
     let state = web::Data::new(AppState {
         db_pool,
         config: config.clone(),
+        rate_limiter,
     });
 
     let port = config.base.port.unwrap_or(8080);

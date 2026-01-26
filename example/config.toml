@@ -3,6 +3,11 @@ code_size = 6
 port = 8080
 bearer_token = "CrGNF75kBN"
 
+[base.rate_limit]
+enabled = true
+max_requests = 10
+window_seconds = 60
+
 [database]
 database_type = "sqlite"
 database = "swiftlink.db" # Path to the SQLite database file
