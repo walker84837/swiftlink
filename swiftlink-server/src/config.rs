@@ -59,8 +59,38 @@ pub struct DatabaseConfig {
 }
 
 impl DatabaseConfig {
-    pub fn database_url(&self) -> String {
-        todo!("copy from database logic in `fn main()`")
+    /// Return a connection string for the database
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database struct has mandatory fields set as [`Option::None`]
+    pub fn database_url(&self) -> Result<String, String> {
+        match self.database_type {
+            DatabaseType::Postgres => {
+                let username = self
+                    .username
+                    .as_ref()
+                    .ok_or("Username must be specified for Postgres")?;
+
+                let password = self
+                    .password
+                    .as_ref()
+                    .ok_or("Password must be specified for Postgres")?;
+
+                let host = self.host.as_deref().unwrap_or("localhost");
+                let port = self.port.unwrap_or(5432);
+                let database = self.database.as_deref().unwrap_or("swiftlink_db");
+
+                Ok(format!(
+                    "postgres://{}:{}@{}:{}/{}",
+                    username, password, host, port, database
+                ))
+            }
+            DatabaseType::Sqlite => self
+                .database
+                .clone()
+                .ok_or_else(|| "Database path must be specified for SQLite".to_string()),
+        }
     }
 }
 

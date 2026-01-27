@@ -1,14 +1,14 @@
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
 use clap::{Parser, ValueHint};
 use env_logger::Target;
 use governor::{
+    Quota, RateLimiter,
     clock::QuantaClock,
     state::{InMemoryState, NotKeyed},
-    Quota, RateLimiter,
 };
-use log::{error, info, warn, LevelFilter};
-use rand::{distr::Alphanumeric, RngExt};
-use sqlx::{postgres::PgPoolOptions, sqlite::SqlitePoolOptions, PgPool, SqlitePool};
+use log::{LevelFilter, error, info, warn};
+use rand::{RngExt, distr::Alphanumeric};
+use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
 use std::{
     borrow::Cow,
     fs,
@@ -35,6 +35,9 @@ enum ServerError {
 
     #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
+
+    #[error("Invalid configuration: {0}")]
+    InvalidConfig(String),
 }
 
 fn generate_random_code(code_size: usize) -> String {
@@ -494,19 +497,11 @@ async fn main() -> SwiftlinkResult<()> {
     let db_config = &config.database;
 
     let db_pool = match db_config.database_type {
-        // TODO: move database url logic to fn DatabaseConfig::database_url
         DatabaseType::Postgres => {
-            let database_url = format!(
-                "postgres://{}:{}@{}:{}/{}",
-                db_config.username.as_ref().unwrap(),
-                db_config.password.as_ref().unwrap(),
-                db_config.host.as_ref().unwrap_or(&"localhost".to_string()),
-                db_config.port.unwrap_or(5432),
-                db_config
-                    .database
-                    .as_ref()
-                    .unwrap_or(&"swiftlink_db".to_string()),
-            );
+            let database_url = db_config
+                .database_url()
+                .map_err(ServerError::InvalidConfig)?;
+
             let pool = PgPoolOptions::new()
                 .max_connections(db_config.max_connections.unwrap_or(5))
                 .connect(&database_url)
@@ -516,12 +511,12 @@ async fn main() -> SwiftlinkResult<()> {
         }
         DatabaseType::Sqlite => {
             let database_url = db_config
-                .database
-                .as_ref()
-                .expect("Database path must be specified for SQLite");
+                .database_url()
+                .map_err(ServerError::InvalidConfig)?;
+
             let pool = SqlitePoolOptions::new()
                 .max_connections(db_config.max_connections.unwrap_or(5))
-                .connect(database_url)
+                .connect(&database_url)
                 .await
                 .expect("Failed to create database pool.");
             Pool::Sqlite(pool)
