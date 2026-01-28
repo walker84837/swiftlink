@@ -1,22 +1,33 @@
-use actix_web::body::EitherBody;
-use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
-use actix_web::{Error, HttpResponse};
+use actix_web::{
+    Error, HttpResponse,
+    body::EitherBody,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+};
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use governor::{Quota, RateLimiter, clock::QuantaClock, state::keyed::DefaultKeyedStateStore};
 use log::warn;
-use std::net::IpAddr;
-use std::num::NonZeroU32;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::time::Duration;
 
-type SharedRateLimiter =
-    Arc<RateLimiter<(IpAddr, String), DefaultKeyedStateStore<(IpAddr, String)>, QuantaClock>>;
+use std::{
+    net::IpAddr,
+    num::NonZeroU32,
+    rc::Rc,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+/// A key (IP address, route) used by the rate limiter to identify a client.
+/// The combination is used to scope rate limits per-route.
+type RateKey = (IpAddr, String);
+
+/// Shared, thread-safe rate limiter instance. This enforces request rate limits keyed by [`RateKey`].
+///
+/// Rate limits apply per unique [`RateKey`] tuple.
+type SharedRateLimiter = Arc<RateLimiter<RateKey, DefaultKeyedStateStore<RateKey>, QuantaClock>>;
 
 /// Rate limiting middleware using in-memory storage
 #[derive(Clone)]
 pub struct RateLimitMiddleware {
-    // Key is (IP, Route) to support per-route limits
     limiter: SharedRateLimiter,
     enabled: bool,
     trust_proxy_headers: bool,
@@ -65,7 +76,7 @@ where
     B: 'static,
 {
     type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
+    type Error = actix_web::Error;
     type InitError = ();
     type Transform = RateLimitMiddlewareService<S>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
@@ -80,6 +91,7 @@ where
     }
 }
 
+/// Internal service that wraps the inner service and enforces rate limiting
 pub struct RateLimitMiddlewareService<S> {
     service: Rc<S>,
     limiter: SharedRateLimiter,
@@ -97,10 +109,7 @@ where
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(
-        &self,
-        ctx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(ctx)
     }
 
@@ -110,8 +119,11 @@ where
         let enabled = self.enabled;
         let trust_proxy_headers = self.trust_proxy_headers;
 
+        // Create a future that will forward the request to the inner service
         Box::pin(async move {
+            // If rate limiting is disabled, return early
             if !enabled {
+                // Forward the request to the inner service unmodified
                 return service.call(req).await.map(|res| res.map_into_left_body());
             }
 
@@ -128,6 +140,7 @@ where
             let route_key = req
                 .match_pattern()
                 .unwrap_or_else(|| req.path().to_string());
+
             let key = (ip, route_key);
 
             if limiter.check_key(&key).is_err() {
@@ -144,47 +157,62 @@ where
 }
 
 /// Extract real client IP from request, supporting reverse proxies if configured
+///
+/// See:
+/// - <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For>
+/// - <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Forwarded>
 fn extract_client_ip(req: &ServiceRequest, trust_proxy_headers: bool) -> Option<IpAddr> {
-    if trust_proxy_headers {
-        // Try X-Forwarded-For header first (most comprehensive)
-        if let Some(forwarded_str) = req
-            .headers()
-            .get("x-forwarded-for")
-            .and_then(|h| h.to_str().ok())
-        {
-            // X-Forwarded-For can contain multiple IPs, take the first one
-            let first_ip = forwarded_str.split(',').next()?.trim();
-            if let Ok(ip) = first_ip.parse() {
-                return Some(normalize_ip(ip));
-            }
-        }
+    if !trust_proxy_headers {
+        // Get the direct peer IP
+        return req.peer_addr().map(|addr| normalize_ip(addr.ip()));
+    }
 
-        // Try Forwarded header (RFC 7239)
-        if let Some(forwarded_str) = req.headers().get("forwarded").and_then(|h| h.to_str().ok()) {
-            // Forwarded header format: for=192.0.2.1;proto=http
-            for part in forwarded_str.split(',') {
-                let part = part.trim();
-                if part.to_lowercase().starts_with("for=") {
-                    let ip_part = &part[4..];
-                    // Handle parameters separated by semicolon (e.g. for=1.2.3.4;proto=https)
-                    let ip_part = ip_part.split(';').next().unwrap_or(ip_part);
-                    // Remove any quotes, brackets (for IPv6) and whitespace
-                    let ip_str = ip_part
-                        .trim()
-                        .trim_matches('"')
-                        .trim_start_matches('[')
-                        .trim_end_matches(']');
+    // Try X-Forwarded-For header first
+    if let Some(ip) = req
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(str::trim)
+        .and_then(|ip_str| ip_str.parse().ok())
+    {
+        return Some(normalize_ip(ip));
+    }
 
-                    if let Ok(ip) = ip_str.parse() {
-                        return Some(normalize_ip(ip));
-                    }
-                }
+    // Try Forwarded header (RFC 7239)
+    if let Some(forwarded_str) = req.headers().get("forwarded").and_then(|h| h.to_str().ok())
+        && let Some(ip) = forwarded_str
+            .split(',')
+            .map(str::trim)
+            .filter_map(extract_for_param)
+            .next()
+    {
+        return Some(normalize_ip(ip));
+    }
+
+    // Fallback to direct peer IP if no forwarded headers are valid
+    req.peer_addr().map(|addr| normalize_ip(addr.ip()))
+}
+
+/// Extracts the client IP from the `for=...` value in the HTTP `Forwarded` field
+fn extract_for_param(forwarded_element: &str) -> Option<IpAddr> {
+    for part in forwarded_element.split(';').map(str::trim) {
+        // Lowercase for comparison, but keep original for parsing
+        let part_lower = part.to_lowercase();
+        if part_lower.starts_with("for=") {
+            // Use original 'part' to preserve casing for parsing
+            let stripped = &part[4..]; // skip "for="
+            let ip_str = stripped
+                .trim_matches('"')
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .trim();
+            if let Ok(ip) = ip_str.parse() {
+                return Some(ip);
             }
         }
     }
-
-    // Fallback to direct connection IP
-    req.peer_addr().map(|addr| normalize_ip(addr.ip()))
+    None
 }
 
 /// Normalize IPv6-mapped IPv4 addresses to IPv4
