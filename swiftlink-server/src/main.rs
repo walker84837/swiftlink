@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::unwrap_used)]
 
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
 use clap::{Parser, ValueHint};
 use env_logger::Target;
-use log::{error, info, warn, LevelFilter};
-use rand::{distr::Alphanumeric, RngExt};
-use sqlx::{postgres::PgPoolOptions, sqlite::SqlitePoolOptions, PgPool, SqlitePool};
+use log::{LevelFilter, error, info, warn};
+use rand::{RngExt, distr::Alphanumeric};
+use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
 use std::{
     borrow::Cow,
     fs,
