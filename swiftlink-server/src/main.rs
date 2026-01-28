@@ -59,7 +59,6 @@ enum Pool {
 struct AppState {
     db_pool: Pool,
     config: Arc<Config>,
-    rate_limiter: RateLimitMiddleware,
 }
 
 /// Initialize the database (create the links table)
@@ -206,14 +205,6 @@ async fn delete_link(
     path: web::Path<String>,
     req: HttpRequest,
 ) -> impl Responder {
-    // Rate limiting check
-    if let Err(response) = state
-        .rate_limiter
-        .check_rate_limit(req.peer_addr().map(|s| s.ip()))
-    {
-        return response;
-    }
-
     let configured_token = match &state.config.base.bearer_token {
         Some(tok) => tok.clone(),
         None => {
@@ -274,16 +265,7 @@ async fn delete_link(
 async fn create_link(
     state: web::Data<AppState>,
     req: web::Json<CreateLinkRequest>,
-    http_req: HttpRequest,
 ) -> impl Responder {
-    // Rate limiting check
-    if let Err(response) = state
-        .rate_limiter
-        .check_rate_limit(http_req.peer_addr().map(|s| s.ip()))
-    {
-        return response;
-    }
-
     // Input Validation
     if let Err(e) = validate_url(&req.url) {
         return HttpResponse::BadRequest().body(e);
@@ -348,19 +330,7 @@ struct LinkInfo {
 }
 
 /// API Handler: Get link info (given a code)
-async fn get_link_info(
-    state: web::Data<AppState>,
-    path: web::Path<String>,
-    http_req: HttpRequest,
-) -> impl Responder {
-    // Rate limiting check
-    if let Err(response) = state
-        .rate_limiter
-        .check_rate_limit(http_req.peer_addr().map(|s| s.ip()))
-    {
-        return response;
-    }
-
+async fn get_link_info(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
     let code = path.into_inner();
     let result = match &state.db_pool {
         Pool::Postgres(pool) => {
@@ -391,19 +361,7 @@ async fn get_link_info(
 }
 
 /// Handler for redirection: given a code, look up the original URL and redirect.
-async fn redirect(
-    state: web::Data<AppState>,
-    path: web::Path<String>,
-    http_req: HttpRequest,
-) -> impl Responder {
-    // Rate limiting check
-    if let Err(response) = state
-        .rate_limiter
-        .check_rate_limit(http_req.peer_addr().map(|s| s.ip()))
-    {
-        return response;
-    }
-
+async fn redirect(state: web::Data<AppState>, path: web::Path<String>) -> impl Responder {
     let code = path.into_inner();
     let result = match &state.db_pool {
         Pool::Postgres(pool) => {
@@ -513,7 +471,6 @@ async fn main() -> SwiftlinkResult<()> {
     let state = web::Data::new(AppState {
         db_pool,
         config: config.clone(),
-        rate_limiter,
     });
 
     let port = config.base.port.unwrap_or(8080);
@@ -521,6 +478,7 @@ async fn main() -> SwiftlinkResult<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(rate_limiter.clone())
             .app_data(state.clone())
             .route("/api/create", web::post().to(create_link))
             .route("/api/info/{code}", web::get().to(get_link_info))
