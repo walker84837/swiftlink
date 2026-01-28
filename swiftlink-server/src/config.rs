@@ -18,6 +18,8 @@ pub struct RateLimitConfig {
     pub window_seconds: Option<u64>,
     /// Enable/disable rate limiting (default: true)
     pub enabled: Option<bool>,
+    /// Whether to trust X-Forwarded-For and Forwarded headers (default: false)
+    pub trust_proxy_headers: Option<bool>,
 }
 
 /// Base options, for the web server and core functionality
@@ -105,6 +107,7 @@ impl Default for Config {
                     max_requests: Some(10),
                     window_seconds: Some(60),
                     enabled: Some(true),
+                    trust_proxy_headers: Some(false),
                 }),
             },
             database: DatabaseConfig {

@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::unwrap_used)]
+#![cfg_attr(not(test), warn(clippy::unwrap_used))]
 
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
 use clap::{Parser, ValueHint};
@@ -466,6 +466,9 @@ async fn main() -> SwiftlinkResult<()> {
             .and_then(|c| c.window_seconds)
             .unwrap_or(60),
         rate_limit_config.and_then(|c| c.enabled).unwrap_or(true),
+        rate_limit_config
+            .and_then(|c| c.trust_proxy_headers)
+            .unwrap_or(false),
     );
 
     let state = web::Data::new(AppState {
