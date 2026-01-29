@@ -3,9 +3,23 @@ code_size = 6
 port = 8080
 bearer_token = "CrGNF75kBN"
 
+[base.rate_limit]
+enabled = true
+max_requests = 10
+window_seconds = 60
+# Sysadmins usually run services behind a reverse proxy (Nginx, Caddy, etc.) for tunneling HTTP
+# traffic under SSL. Rate limiting would conflict with this because clients making requests will
+# be "redirected" to the proxy, not the service, and so the service will believe the reverse proxy
+# should be rate limited.
+# Setting this to true avoids this problem.
+trust_proxy_headers = false
+max_tracked_clients = 10000
+
 [database]
+# The database_type setting must be one of "sqlite" or "postgres"
 database_type = "sqlite"
-database = "swiftlink.db" # Path to the SQLite database file
+# Path to the SQLite database file
+database = "swiftlink.db"
 max_connections = 12
 
 # [database]

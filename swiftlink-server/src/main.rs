@@ -1,9 +1,11 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(not(test), warn(clippy::unwrap_used))]
+
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
 use clap::{Parser, ValueHint};
 use env_logger::Target;
 use log::{LevelFilter, error, info, warn};
-use rand::{Rng, distr::Alphanumeric};
-use serde::Deserialize;
+use rand::{RngExt, distr::Alphanumeric};
 use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
 use std::{
     borrow::Cow,
@@ -19,6 +21,14 @@ use thiserror::Error;
 
 type SwiftlinkResult<T> = Result<T, ServerError>;
 
+mod config;
+mod rate_limit;
+
+use crate::{
+    config::{Config, DatabaseType},
+    rate_limit::RateLimitMiddleware,
+};
+
 #[derive(Debug, Error)]
 enum ServerError {
     #[error("Database error: {0}")]
@@ -26,6 +36,9 @@ enum ServerError {
 
     #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
+
+    #[error("Invalid configuration: {0}")]
+    InvalidConfig(String),
 }
 
 fn generate_random_code(code_size: usize) -> String {
@@ -36,76 +49,7 @@ fn generate_random_code(code_size: usize) -> String {
         .collect()
 }
 
-/// Server configuration, comprising of base options and database configuration
-#[derive(Deserialize)]
-struct Config {
-    /// Base options
-    base: BaseOptions,
-    /// Database configuration details
-    database: DatabaseConfig,
-}
-
-/// Base options, for the web server and core functionality
-#[derive(Deserialize)]
-struct BaseOptions {
-    /// Code length for generated short links, default is 6 if not provided
-    code_size: Option<usize>,
-    /// Port for the web server to listen on
-    port: Option<u16>,
-    /// (Optional) 10‐character alphanumeric bearer token for DELETE.
-    /// If omitted, we generate one at startup and log it.
-    bearer_token: Option<String>,
-}
-
-#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum DatabaseType {
-    Postgres,
-    Sqlite,
-}
-
-/// Database-specific configuration
-#[derive(Deserialize)]
-struct DatabaseConfig {
-    #[serde(default = "default_database_type")]
-    database_type: DatabaseType,
-    username: Option<String>,
-    password: Option<String>,
-    /// Optional host (default "localhost")
-    host: Option<String>,
-    /// Optional port (default 5432)
-    port: Option<u16>,
-    /// Optional database name (default "swiftlink_db")
-    database: Option<String>,
-    max_connections: Option<u32>,
-}
-
-fn default_database_type() -> DatabaseType {
-    DatabaseType::Postgres
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            base: BaseOptions {
-                code_size: Some(6),
-                port: Some(8080),
-                bearer_token: None,
-            },
-            database: DatabaseConfig {
-                database_type: DatabaseType::Postgres,
-                username: Some("postgres".into()),
-                password: Some("password".into()),
-                host: Some("localhost".into()),
-                port: Some(5432),
-                database: Some("swiftlink_db".into()),
-                max_connections: Some(5),
-            },
-        }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Pool {
     Postgres(PgPool),
     Sqlite(SqlitePool),
@@ -444,7 +388,6 @@ async fn redirect(state: web::Data<AppState>, path: web::Path<String>) -> impl R
         }
     }
 }
-
 /// Command-line arguments structure.
 #[derive(Parser)]
 struct Args {
@@ -485,17 +428,10 @@ async fn main() -> SwiftlinkResult<()> {
 
     let db_pool = match db_config.database_type {
         DatabaseType::Postgres => {
-            let database_url = format!(
-                "postgres://{}:{}@{}:{}/{}",
-                db_config.username.as_ref().unwrap(),
-                db_config.password.as_ref().unwrap(),
-                db_config.host.as_ref().unwrap_or(&"localhost".to_string()),
-                db_config.port.unwrap_or(5432),
-                db_config
-                    .database
-                    .as_ref()
-                    .unwrap_or(&"swiftlink_db".to_string()),
-            );
+            let database_url = db_config
+                .database_url()
+                .map_err(ServerError::InvalidConfig)?;
+
             let pool = PgPoolOptions::new()
                 .max_connections(db_config.max_connections.unwrap_or(5))
                 .connect(&database_url)
@@ -505,12 +441,12 @@ async fn main() -> SwiftlinkResult<()> {
         }
         DatabaseType::Sqlite => {
             let database_url = db_config
-                .database
-                .as_ref()
-                .expect("Database path must be specified for SQLite");
+                .database_url()
+                .map_err(ServerError::InvalidConfig)?;
+
             let pool = SqlitePoolOptions::new()
                 .max_connections(db_config.max_connections.unwrap_or(5))
-                .connect(database_url)
+                .connect(&database_url)
                 .await
                 .expect("Failed to create database pool.");
             Pool::Sqlite(pool)
@@ -522,6 +458,20 @@ async fn main() -> SwiftlinkResult<()> {
         return Err(e);
     }
 
+    // Create rate limiter from configuration
+    let rate_limit_config = config.base.rate_limit.as_ref();
+    let rate_limiter = RateLimitMiddleware::new(
+        rate_limit_config.and_then(|c| c.max_requests).unwrap_or(10),
+        rate_limit_config
+            .and_then(|c| c.window_seconds)
+            .unwrap_or(60),
+        rate_limit_config.and_then(|c| c.enabled).unwrap_or(true),
+        rate_limit_config
+            .and_then(|c| c.trust_proxy_headers)
+            .unwrap_or(false),
+        rate_limit_config.and_then(|c| c.max_tracked_clients),
+    );
+
     let state = web::Data::new(AppState {
         db_pool,
         config: config.clone(),
@@ -532,6 +482,7 @@ async fn main() -> SwiftlinkResult<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(rate_limiter.clone())
             .app_data(state.clone())
             .route("/api/create", web::post().to(create_link))
             .route("/api/info/{code}", web::get().to(get_link_info))
