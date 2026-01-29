@@ -20,6 +20,8 @@ pub struct RateLimitConfig {
     pub enabled: Option<bool>,
     /// Whether to trust X-Forwarded-For and Forwarded headers (default: false)
     pub trust_proxy_headers: Option<bool>,
+    /// Maximum number of unique clients to track (default: 10000)
+    pub max_tracked_clients: Option<usize>,
 }
 
 /// Base options, for the web server and core functionality
@@ -108,6 +110,7 @@ impl Default for Config {
                     window_seconds: Some(60),
                     enabled: Some(true),
                     trust_proxy_headers: Some(false),
+                    max_tracked_clients: Some(10000),
                 }),
             },
             database: DatabaseConfig {

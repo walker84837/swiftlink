@@ -8,12 +8,13 @@ use governor::{Quota, RateLimiter, clock::QuantaClock, state::keyed::DefaultKeye
 use log::warn;
 
 use std::{
+    collections::HashMap,
     net::IpAddr,
     num::NonZeroU32,
     rc::Rc,
-    sync::Arc,
+    sync::{Arc, Mutex},
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// A key (IP address, route) used by the rate limiter to identify a client.
@@ -25,10 +26,93 @@ type RateKey = (IpAddr, String);
 /// Rate limits apply per unique [`RateKey`] tuple.
 type SharedRateLimiter = Arc<RateLimiter<RateKey, DefaultKeyedStateStore<RateKey>, QuantaClock>>;
 
-/// Rate limiting middleware using in-memory storage
+/// LRU cache entry for rate limiting state
+#[derive(Clone)]
+struct LruEntry {
+    last_accessed: Instant,
+    /// Whether this entry is actively being used
+    active: bool,
+}
+
+/// Bounded LRU cache for rate limiter state entries
+///
+/// This prevents memory exhaustion attacks by limiting the number of unique
+/// clients that can be tracked simultaneously. When the limit is reached,
+/// the least recently used inactive entries are evicted to make room.
+#[derive(Clone)]
+struct BoundedStateStore {
+    max_entries: usize,
+    entries: Arc<Mutex<HashMap<RateKey, LruEntry>>>,
+}
+
+impl BoundedStateStore {
+    fn new(max_entries: usize) -> Self {
+        Self {
+            max_entries,
+            entries: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Check if we can accommodate a new entry, evicting oldest if necessary
+    fn can_add_entry(&self, key: &RateKey) -> bool {
+        let mut entries = self.entries.lock().expect("lock is held by current thread");
+
+        // If entry already exists, just update access time
+        if let Some(entry) = entries.get_mut(key) {
+            entry.last_accessed = Instant::now();
+            entry.active = true;
+            return true;
+        }
+
+        // If we have space, add new entry
+        if entries.len() < self.max_entries {
+            entries.insert(
+                key.clone(),
+                LruEntry {
+                    last_accessed: Instant::now(),
+                    active: true,
+                },
+            );
+            return true;
+        }
+
+        // Find and evict least recently used inactive entry
+        if let Some((oldest_key, _)) = entries
+            .iter()
+            .filter(|(_, entry)| !entry.active)
+            .min_by_key(|(_, entry)| entry.last_accessed)
+            .map(|(k, v)| (k.clone(), v))
+        {
+            entries.remove(&oldest_key);
+            entries.insert(
+                key.clone(),
+                LruEntry {
+                    last_accessed: Instant::now(),
+                    active: true,
+                },
+            );
+            true
+        } else {
+            // No inactive entries to evict, at capacity
+            false
+        }
+    }
+
+    /// Mark entry as inactive (no longer being rate limited)
+    fn mark_inactive(&self, key: &RateKey) {
+        if let Ok(mut entries) = self.entries.lock()
+            && let Some(entry) = entries.get_mut(key)
+        {
+            entry.active = false;
+        }
+    }
+}
+
+/// Rate limiting middleware using bounded in-memory storage
 #[derive(Clone)]
 pub struct RateLimitMiddleware {
     limiter: SharedRateLimiter,
+    state_store: BoundedStateStore,
     enabled: bool,
     trust_proxy_headers: bool,
 }
@@ -39,6 +123,7 @@ impl RateLimitMiddleware {
         window_seconds: u64,
         enabled: bool,
         trust_proxy_headers: bool,
+        max_tracked_clients: Option<usize>,
     ) -> Self {
         let max_requests_nz =
             NonZeroU32::new(max_requests.max(1)).expect("max_requests must be > 0");
@@ -61,8 +146,11 @@ impl RateLimitMiddleware {
             QuantaClock::default(),
         ));
 
+        let state_store = BoundedStateStore::new(max_tracked_clients.unwrap_or(10000));
+
         Self {
             limiter,
+            state_store,
             enabled,
             trust_proxy_headers,
         }
@@ -85,6 +173,7 @@ where
         ready(Ok(RateLimitMiddlewareService {
             service: Rc::new(service),
             limiter: self.limiter.clone(),
+            state_store: self.state_store.clone(),
             enabled: self.enabled,
             trust_proxy_headers: self.trust_proxy_headers,
         }))
@@ -95,6 +184,7 @@ where
 pub struct RateLimitMiddlewareService<S> {
     service: Rc<S>,
     limiter: SharedRateLimiter,
+    state_store: BoundedStateStore,
     enabled: bool,
     trust_proxy_headers: bool,
 }
@@ -116,6 +206,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = self.service.clone();
         let limiter = self.limiter.clone();
+        let state_store = self.state_store.clone();
         let enabled = self.enabled;
         let trust_proxy_headers = self.trust_proxy_headers;
 
@@ -143,7 +234,18 @@ where
 
             let key = (ip, route_key);
 
+            // Check if we can track this client (bounded memory usage)
+            if !state_store.can_add_entry(&key) {
+                warn!(
+                    "Rate limit skipped: too many tracked clients ({} {})",
+                    req.method(),
+                    req.path()
+                );
+                return service.call(req).await.map(|res| res.map_into_left_body());
+            }
+
             if limiter.check_key(&key).is_err() {
+                state_store.mark_inactive(&key);
                 let response = HttpResponse::TooManyRequests().json(serde_json::json!({
                     "error": "Rate limit exceeded",
                     "message": "Too many requests. Please try again later."
@@ -151,6 +253,7 @@ where
                 return Ok(req.into_response(response).map_into_right_body());
             }
 
+            state_store.mark_inactive(&key);
             service.call(req).await.map(|res| res.map_into_left_body())
         })
     }
@@ -303,7 +406,7 @@ mod tests {
     #[actix_web::test]
     async fn test_middleware_blocks_excess_requests() {
         // Allow 2 requests per minute
-        let mw = RateLimitMiddleware::new(2, 60, true, false);
+        let mw = RateLimitMiddleware::new(2, 60, true, false, Some(1000));
 
         let app = test::init_service(
             App::new()
@@ -333,7 +436,7 @@ mod tests {
     #[actix_web::test]
     async fn test_middleware_per_route_isolation() {
         // Allow 1 request per minute
-        let mw = RateLimitMiddleware::new(1, 60, true, false);
+        let mw = RateLimitMiddleware::new(1, 60, true, false, Some(1000));
 
         let app = test::init_service(
             App::new()
@@ -370,7 +473,7 @@ mod tests {
     #[actix_web::test]
     async fn test_middleware_match_pattern() {
         // Allow 1 request per minute
-        let mw = RateLimitMiddleware::new(1, 60, true, false);
+        let mw = RateLimitMiddleware::new(1, 60, true, false, Some(1000));
 
         let app = test::init_service(App::new().wrap(mw).route(
             "/user/{id}",
@@ -389,5 +492,42 @@ mod tests {
         let req = TestRequest::get().uri("/user/2").peer_addr(ip).to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 429);
+    }
+
+    #[actix_web::test]
+    async fn test_bounded_state_store_behavior() {
+        // Allow 1 request per minute, but only track 2 clients
+        let mw = RateLimitMiddleware::new(1, 60, true, false, Some(2));
+
+        let app = test::init_service(
+            App::new()
+                .wrap(mw)
+                .route("/", web::get().to(|| async { HttpResponse::Ok().finish() })),
+        )
+        .await;
+
+        // First client - OK
+        let req1 = TestRequest::get()
+            .uri("/")
+            .peer_addr("127.0.0.1:12345".parse().unwrap())
+            .to_request();
+        let resp1 = test::call_service(&app, req1).await;
+        assert_eq!(resp1.status(), 200);
+
+        // Second client - OK
+        let req2 = TestRequest::get()
+            .uri("/")
+            .peer_addr("127.0.0.2:12345".parse().unwrap())
+            .to_request();
+        let resp2 = test::call_service(&app, req2).await;
+        assert_eq!(resp2.status(), 200);
+
+        // Third client - Should skip rate limiting (at capacity) but still be allowed
+        let req3 = TestRequest::get()
+            .uri("/")
+            .peer_addr("127.0.0.3:12345".parse().unwrap())
+            .to_request();
+        let resp3 = test::call_service(&app, req3).await;
+        assert_eq!(resp3.status(), 200); // Should be allowed due to capacity limit
     }
 }

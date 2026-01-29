@@ -469,6 +469,7 @@ async fn main() -> SwiftlinkResult<()> {
         rate_limit_config
             .and_then(|c| c.trust_proxy_headers)
             .unwrap_or(false),
+        rate_limit_config.and_then(|c| c.max_tracked_clients),
     );
 
     let state = web::Data::new(AppState {

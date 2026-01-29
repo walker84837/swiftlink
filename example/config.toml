@@ -7,6 +7,7 @@ bearer_token = "CrGNF75kBN"
 enabled = true
 max_requests = 10
 window_seconds = 60
+max_tracked_clients = 10000
 
 [database]
 database_type = "sqlite"
