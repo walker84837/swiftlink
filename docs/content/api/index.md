@@ -5,6 +5,7 @@ Swiftlink exposes a simple REST API for managing short links. The API is designe
 ## Architecture
 
 The API is defined in the `swiftlink-api` crate, which serves as the single source of truth for:
+
 - Request and response types
 - Error handling
 - Client implementations (both async and blocking)
