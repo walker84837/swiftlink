@@ -80,14 +80,31 @@ If you're not a developer or know Rust, contributions to Swiftlink don't need to
 For testing with a local database:
 
 **PostgreSQL**:
-TODO
+
+1. Install PostgreSQL:
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install postgresql postgresql-contrib
+   
+   # macOS (with Homebrew)
+   brew install postgresql
+   brew services start postgresql
+   ```
+
+2. Create a database and user:
+   ```sql
+   psql -U postgres
+   
+   CREATE DATABASE swiftlink_db;
+   CREATE USER swiftlink_user WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE swiftlink_db TO swiftlink_user;
+   ```
+
+3. Configure the server to use PostgreSQL (see `example/config.toml`)
 
 **SQLite**:
-TODO
 
-```bash
-export DATABASE_URL="sqlite://..."
-```
+SQLite requires no setup - just specify a file path in the configuration. The default `example/config.toml` uses SQLite.
 
 #### Reporting Bugs
 
@@ -105,15 +122,15 @@ Swiftlink is organized as a Cargo workspace with three main crates:
 
 ### `swiftlink-server` - HTTP Server
 
-TODO
+The core web server that handles URL shortening, redirects, and the REST API. Built with Actix-web, it handles HTTP requests, manages database connections, and serves the short link functionality.
 
 ### `swiftlink-api` - Shared Library
 
-TODO
+A Rust library containing request/response types and client implementations (both async and blocking). Used by `swiftclient` and can be used by other Rust applications to interact with a Swiftlink server.
 
 ### `swiftclient` - CLI Tool
 
-TODO
+A command-line interface for interacting with a Swiftlink server. Allows creating, retrieving info about, and deleting short links without direct database access.
 
 ## Development Guidelines
 

@@ -72,7 +72,41 @@ Error responses include descriptive messages:
 
 ## Rate Limiting
 
-[TODO](../roadmap.md)
+Swiftlink includes built-in rate limiting to prevent abuse and ensure fair usage. Rate limits are enforced per-client IP address and per-route pattern.
+
+### Rate Limit Headers
+
+When a request is rate-limited, the server responds with `429 Too Many Requests` and includes headers indicating the rate limit status:
+
+- `X-RateLimit-Limit` - Maximum requests allowed in the window
+- `X-RateLimit-Remaining` - Requests remaining in the current window
+- `X-RateLimit-Reset` - Unix timestamp when the rate limit resets
+
+### Configuration
+
+Rate limiting is configured in the server's configuration file:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `enabled` | Enable/disable rate limiting | `true` |
+| `max_requests` | Maximum requests per window | `10` |
+| `window_seconds` | Time window in seconds | `60` |
+| `trust_proxy_headers` | Trust X-Forwarded-For headers | `false` |
+| `max_tracked_clients` | Maximum unique clients to track | `10000` |
+
+Example configuration:
+
+```toml
+[base.rate_limit]
+enabled = true
+max_requests = 10
+window_seconds = 60
+trust_proxy_headers = false
+max_tracked_clients = 10000
+```
+
+!!! note
+    When running behind a reverse proxy (like Nginx or Caddy), set `trust_proxy_headers = true` to ensure rate limiting works correctly based on the original client IP.
 
 ## CORS
 
