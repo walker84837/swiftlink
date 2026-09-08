@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), warn(clippy::unwrap_used))]
 
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
 use clap::{Parser, ValueHint};
 use env_logger::Target;
-use log::{error, info, warn, LevelFilter};
-use rand::{distr::Alphanumeric, RngExt};
-use sqlx::{postgres::PgPoolOptions, sqlite::SqlitePoolOptions, PgPool, SqlitePool};
+use log::{LevelFilter, error, info, warn};
+use rand::{RngExt, distr::Alphanumeric};
+use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
 use std::{
     borrow::Cow,
     fs,
@@ -201,11 +201,11 @@ async fn handle_unique_conflict(db_pool: &Pool, url: &str) -> Result<HttpRespons
     }
 }
 
-/// Constant-time string verification.
+/// Constant-time string comparison.
 ///
 /// # Returns
 ///
-/// Returns `true` only if `provided` equals `configured`.
+/// Returns `true` only if `lhs` equals `rhs`.
 fn constant_time_eq<L: AsRef<str>, R: AsRef<str>>(lhs: L, rhs: R) -> bool {
     let provided_bytes = lhs.as_ref().as_bytes();
     let configured_bytes = rhs.as_ref().as_bytes();

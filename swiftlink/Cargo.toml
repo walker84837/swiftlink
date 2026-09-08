@@ -1,7 +1,13 @@
 [package]
-name = "swiftlink-server"
+name = "swiftlink"
 version = "0.0.3"
 edition = "2024"
+description = "Swiftlink URL shortener server - fast, flexible link shortening with a simple API"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/walker84837/swiftlink"
+readme = "../README.md"
+categories = ["web-programming", "database", "authentication", "caching", "command-line-interface"]
+keywords = ["url-shortener", "link-shortening", "actix-web", "rest-api"]
 
 [dependencies]
 actix-web = { version = "4.12.1", features = ["rustls"] }
