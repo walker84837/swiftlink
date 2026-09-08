@@ -2687,7 +2687,7 @@ name = "swiftclient"
 version = "0.0.2"
 dependencies = [
  "clap",
- "swiftlink-api",
+ "swiftlink-api 0.0.2",
 ]
 
 [[package]]
@@ -2705,7 +2705,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "subtle",
- "swiftlink-api",
+ "swiftlink-api 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
  "toml",
  "url",
@@ -2714,6 +2714,18 @@ dependencies = [
 [[package]]
 name = "swiftlink-api"
 version = "0.0.2"
+dependencies = [
+ "reqwest",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "swiftlink-api"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0325e319b49b749fe957f8bd49645ac63f1a28def103ba06143364872b91b6eb"
 dependencies = [
  "reqwest",
  "serde",
