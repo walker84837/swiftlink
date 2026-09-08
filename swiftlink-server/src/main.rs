@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), warn(clippy::unwrap_used))]
 
-use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use clap::{Parser, ValueHint};
 use env_logger::Target;
-use log::{LevelFilter, error, info, warn};
-use rand::{RngExt, distr::Alphanumeric};
-use sqlx::{PgPool, SqlitePool, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
+use log::{error, info, warn, LevelFilter};
+use rand::{distr::Alphanumeric, RngExt};
+use sqlx::{postgres::PgPoolOptions, sqlite::SqlitePoolOptions, PgPool, SqlitePool};
 use std::{
     borrow::Cow,
     fs,
@@ -16,6 +16,7 @@ use std::{
 };
 use url::Url;
 
+use subtle::ConstantTimeEq;
 use swiftlink_api::{CreateLinkRequest, CreateLinkResponse, InfoResponse};
 use thiserror::Error;
 
@@ -200,6 +201,18 @@ async fn handle_unique_conflict(db_pool: &Pool, url: &str) -> Result<HttpRespons
     }
 }
 
+/// Constant-time string verification.
+///
+/// # Returns
+///
+/// Returns `true` only if `provided` equals `configured`.
+fn constant_time_eq<L: AsRef<str>, R: AsRef<str>>(lhs: L, rhs: R) -> bool {
+    let provided_bytes = lhs.as_ref().as_bytes();
+    let configured_bytes = rhs.as_ref().as_bytes();
+
+    provided_bytes.ct_eq(configured_bytes).into()
+}
+
 async fn delete_link(
     state: web::Data<AppState>,
     path: web::Path<String>,
@@ -223,7 +236,7 @@ async fn delete_link(
         return HttpResponse::Unauthorized().body("Missing or invalid authorization header");
     }
     let provided_token = &auth_header[expected_prefix.len()..];
-    if provided_token != configured_token {
+    if !constant_time_eq(provided_token, &configured_token) {
         return HttpResponse::Unauthorized().body("Invalid bearer token");
     }
 
@@ -259,9 +272,8 @@ async fn delete_link(
 
 /// API Handler: Create a new short link
 ///
-/// The main handler calls helper functions for input validation,
-/// existing URL check, insertions etc. This makes error handling and
-/// code readability better.
+/// The main handler calls helper functions for input validation, existing URL check, insertions
+/// etc.
 async fn create_link(
     state: web::Data<AppState>,
     req: web::Json<CreateLinkRequest>,

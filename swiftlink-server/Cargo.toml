@@ -18,3 +18,4 @@ url = "2.5.8"
 governor = "0.10.4"
 swiftlink-api = { path = "../swiftlink-api", features = ["async"] }
 futures-util = "0.3.31"
+subtle = "2.6.1"
