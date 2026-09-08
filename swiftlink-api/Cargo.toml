@@ -2,6 +2,13 @@
 name = "swiftlink-api"
 version = "0.0.2"
 edition = "2024"
+description = "Shared types and client SDK for the Swiftlink URL shortener"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/walker84837/swiftlink"
+readme = "README.md"
+categories = ["api-bindings", "authentication", "web-programming"]
+keywords = ["url-shortener", "api-client", "rest-api"]
+rust-version = "1.88.0"
 
 [features]
 async = ["reqwest", "tokio"]

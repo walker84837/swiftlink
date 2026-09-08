@@ -1,20 +1,20 @@
 [workspace]
 resolver = "3"
 members = [
-    "swiftlink-server",
+    "swiftlink",
     "swiftlink-api",
     "swiftclient",
 ]
 
 [workspace.package]
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 repository = "https://github.com/walker84837/swiftlink"
 rust-version = "1.94.1"
 description = "Swiftlink is a fast, flexible URL shortener. With a simple API, it transforms long URLs into short, shareable links: shortening made simple!"
 license = "Apache-2.0 OR MIT"
-categories = ["web-programming", "database", "authentication", "caching", "command-line-interface"]
-keywords = ["url-shortening", "web-server", "postgresql", "actix-web", "cli-configuration"]
+categories = ["web-programming", "database", "authentication", "command-line-interface"]
+keywords = ["url-shortener", "link-shortening", "actix-web"]
 
 [profile.release]
 strip = true

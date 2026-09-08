@@ -2,6 +2,13 @@
 name = "swiftclient"
 version = "0.0.2"
 edition = "2024"
+description = "Command-line client for the Swiftlink URL shortener"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/walker84837/swiftlink"
+rust-version = "1.88.0"
+readme = "../README.md"
+categories = ["command-line-interface", "command-line-utilities", "web-programming"]
+keywords = ["url-shortener", "cli", "command-line-tool"]
 
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
