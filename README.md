@@ -13,9 +13,9 @@ Swiftlink is a modular URL shortening service designed for performance, simplici
 
 ## Components
 
-- **swiftlink-server** — Actix-web server and redirect engine
+- **swiftlink** — Actix-web server and redirect engine
 - **swiftlink-api** — shared API contract and client SDK
-- **swiftclient** — CLI for managing short links
+- **swiftlink-client** — CLI for managing short links
 
 ## Getting started
 
